@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>记账本</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📒</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="bg-layer"></div>
+<div id="bg-scrim"></div>
+<div class="app">
+  <main>
+    <!-- 明细 -->
+    <section class="view active" id="view-list">
+      <div class="page-title">明细</div>
+      <div class="month-switcher" id="ms-list"></div>
+      <div class="card" id="summary-card"></div>
+      <div class="card" id="list-card"><div id="record-list"></div></div>
+    </section>
+
+    <!-- 图表 -->
+    <section class="view" id="view-charts">
+      <div class="page-title">图表</div>
+      <div class="month-switcher" id="ms-charts"></div>
+      <div class="card" id="donut-card"></div>
+      <div class="card" id="bars-card"></div>
+    </section>
+
+    <!-- 我的 -->
+    <section class="view" id="view-me">
+      <div class="page-title">我的</div>
+      <div class="card">
+        <div class="card-title">每月支出预算</div>
+        <div class="budget-form">
+          <span class="yuan">¥</span>
+          <input id="budget-input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="如 3000，留空则不启用">
+          <button id="btn-budget" class="btn-mini">保存</button>
+        </div>
+        <div class="card-hint">设置后，明细页会显示当月预算使用进度；已用超过 80% 变橙色提醒，超支变红。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">数据管理</div>
+        <div class="stat-line" id="me-stats"></div>
+        <div class="btn-row-3">
+          <button id="btn-export-json" class="btn-outline">导出备份</button>
+          <button id="btn-import" class="btn-outline">导入备份</button>
+          <button id="btn-export-csv" class="btn-outline">导出 Excel</button>
+        </div>
+        <div class="card-hint">数据只保存在当前浏览器中。换浏览器、换电脑或清除浏览数据都会丢失账单，请定期「导出备份」保存 JSON 文件，需要时再「导入备份」恢复。</div>
+        <div id="storage-warn" class="card-hint warn hidden">⚠ 当前环境无法持久保存数据（可能是隐私/无痕模式），请务必及时导出备份。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">关于</div>
+        <div class="card-hint">记账本 v1.1 · 纯本地网页应用，无需联网、不上传任何数据。双击 index.html 即可使用。背景美图来自《鸣潮》官网公开壁纸（版权归库洛游戏所有），每次打开随机更换。</div>
+      </div>
+    </section>
+  </main>
+
+  <button class="fab" id="fab-add" aria-label="记一笔">＋</button>
+
+  <nav class="tabbar">
+    <button class="tab-btn active" data-tab="list">
+      <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>明细</span>
+    </button>
+    <button class="tab-btn" data-tab="charts">
+      <svg viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg><span>图表</span>
+    </button>
+    <button class="tab-btn" data-tab="me">
+      <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>我的</span>
+    </button>
+  </nav>
+
+  <!-- 记一笔弹层 -->
+  <div class="sheet-wrap" id="sheet-wrap">
+    <div class="overlay" id="overlay"></div>
+    <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="记一笔">
+      <div class="sheet-form">
+        <div class="sheet-head">
+          <h3 id="sheet-title">记一笔</h3>
+          <button class="sheet-close" id="sheet-close" aria-label="关闭">×</button>
+        </div>
+        <div class="seg" id="sheet-type">
+          <button type="button" data-type="expense" class="active">支出</button>
+          <button type="button" data-type="income">收入</button>
+        </div>
+        <div class="amount-row">
+          <span class="cur">¥</span>
+          <input id="amount-input" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="0.00" autocomplete="off">
+        </div>
+        <div class="cat-grid" id="cat-grid"></div>
+        <div class="form-grid">
+          <div class="form-item"><label for="date-input">日期</label><input id="date-input" type="date"></div>
+          <div class="form-item"><label for="note-input">备注</label><input id="note-input" type="text" maxlength="50" placeholder="选填"></div>
+        </div>
+        <div class="sheet-actions">
+          <button id="btn-delete" class="btn-danger hidden">删除</button>
+          <button id="btn-save" class="btn-primary">保存</button>
+        </div>
+      </div>
+      <div class="sheet-chara">
+        <img id="chara-art" alt="角色立绘">
+        <div class="chara-tag" id="chara-name"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <input type="file" id="import-file" accept=".json,application/json" hidden>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

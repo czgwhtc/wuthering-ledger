@@ -177,6 +177,29 @@ main { padding: 18px 16px 130px; }
 }
 .profile-form input:focus { border-color: var(--primary); }
 
+/* ---------- 批量删除 ---------- */
+.manage-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 0 2px 10px;
+}
+.manage-bar.managing { border-bottom: 1px solid rgba(20, 30, 60, .08); margin-bottom: 4px; }
+.manage-hint { font-size: 12px; color: var(--muted); }
+.manage-group { display: flex; gap: 6px; }
+.manage-btn {
+  border: 1px solid rgba(20, 30, 60, .15); background: rgba(255, 255, 255, .5);
+  color: var(--text); font-size: 12px; border-radius: 8px; padding: 5px 12px; cursor: pointer;
+}
+.manage-btn.danger { color: var(--expense); border-color: #ffc9c9; }
+.manage-btn.danger.armed { background: var(--expense); color: #fff; border-color: var(--expense); }
+.manage-btn:disabled { opacity: .45; cursor: default; }
+.sel-check {
+  width: 22px; height: 22px; border-radius: 50%; flex: none;
+  border: 2px solid rgba(20, 30, 60, .25);
+  display: grid; place-items: center; font-size: 13px; color: #fff; font-weight: 700;
+}
+.sel-check.on { background: var(--expense); border-color: var(--expense); }
+.record-row.selectable:active { background: rgba(20, 30, 60, .03); }
+
 /* ---------- 预算 ---------- */
 .budget-form { display: flex; align-items: center; gap: 8px; }
 .budget-form .yuan { font-size: 16px; font-weight: 700; color: var(--muted); }

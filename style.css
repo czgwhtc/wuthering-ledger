@@ -174,6 +174,28 @@ main { padding: 18px 16px 130px; }
 }
 .btn-outline:active { background: rgba(255, 255, 255, .85); }
 
+/* ---------- 背景音乐按钮 ---------- */
+.music-btn {
+  position: fixed; top: 16px; right: 16px; z-index: 15;
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .16);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  color: #fff; display: grid; place-items: center; cursor: pointer;
+}
+.music-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.music-btn.playing svg { animation: musicNote 1.2s ease-in-out infinite; }
+.music-btn.playing { animation: musicPulse 2.4s ease-in-out infinite; }
+@keyframes musicPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, .28); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 255, 255, 0); }
+}
+@keyframes musicNote {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+.music-slash { display: none; position: absolute; width: 24px; height: 2px; background: #fff; transform: rotate(-45deg); border-radius: 2px; }
+.music-btn.paused .music-slash { display: block; }
+
 /* ---------- 底部导航与悬浮按钮 ---------- */
 .tabbar {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);

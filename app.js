@@ -809,8 +809,9 @@ async function ghGist(method, path, token, body) {
     let msg = 'HTTP ' + r.status;
     try { const d = await r.json(); msg = d.message || msg; } catch (e) { /* ignore */ }
     if (r.status === 401) msg = '令牌无效或已过期';
-    else if (r.status === 403) msg = '令牌权限不足（需要勾选 gist 权限）';
-    else if (r.status === 404) msg = '云端还没有同步数据（先在一台设备上上传）';
+    else if (r.status === 403) msg = '令牌权限不足（需要 gist 权限，请用软件里的链接重新生成）';
+    else if (r.status === 404 && method === 'GET') msg = '云端还没有同步数据（先在一台设备上上传）';
+    else if (r.status === 404) msg = 'GitHub 拒绝了写入（令牌很可能没有 gist 权限，请用软件里的链接重新生成令牌）';
     throw new Error(msg);
   }
   return r.json();
@@ -841,7 +842,7 @@ async function findSyncGist(token) {
   const store = loadSyncStore();
   if (store.gistId) {
     try { return await ghGist('GET', '/gists/' + store.gistId, token); }
-    catch (e) { if (!String(e.message).includes('不存在')) throw e; }
+    catch (e) { if (!String(e.message).includes('还没有同步数据')) throw e; }
   }
   const gists = await ghGist('GET', '/gists?per_page=100', token);
   const hit = gists.find(g => g.description === GIST_DESC);
@@ -944,9 +945,11 @@ async function runSync(manual) {
     renderSyncCard();
     if (manual) toast('同步完成 ✓');
   } catch (e) {
-    syncLastError = e.message;
+    let msg = e.message || String(e);
+    if (/failed to fetch|networkerror|load failed/i.test(msg)) msg = '网络连不上 api.github.com（手机在大陆网络可能需要代理）';
+    syncLastError = msg;
     renderSyncCard();
-    if (manual) toast('同步失败：' + e.message);
+    if (manual) toast('同步失败：' + msg);
   } finally {
     syncBusy = false;
     if (syncQueued) { syncQueued = false; scheduleAutoSync(800); }

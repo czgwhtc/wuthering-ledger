@@ -20,13 +20,14 @@ body {
   color: var(--text);
 }
 
-/* ---------- 背景图层与压暗层 ---------- */
-#bg-layer {
+/* ---------- 背景图层与压暗层（双层交叉淡入） ---------- */
+#bg-layer, #bg-alt {
   position: fixed; inset: 0; z-index: -2;
   background-color: #1a1d29;
   background-size: cover; background-repeat: no-repeat;
-  animation: bgFade 1s ease;
+  opacity: 0; transition: opacity 1s ease;
 }
+#bg-layer.show, #bg-alt.show { opacity: 1; }
 #bg-scrim {
   position: fixed; inset: 0; z-index: -1;
   background: linear-gradient(180deg,
@@ -35,7 +36,6 @@ body {
     rgba(13, 16, 28, .26) 60%,
     rgba(13, 16, 28, .55) 100%);
 }
-@keyframes bgFade { from { opacity: 0; } to { opacity: 1; } }
 
 .app {
   max-width: 520px;

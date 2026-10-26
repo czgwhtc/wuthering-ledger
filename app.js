@@ -87,15 +87,52 @@ const BACKGROUNDS = [
 ];
 
 function applyRandomBackground() {
-  const layer = document.getElementById('bg-layer');
-  if (!layer) return;
-  const bg = BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)];
+  const first = BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)];
+  showBackground(first);
+  startBackgroundRotation();
+}
+
+let bgCurrentFile = null;
+let bgFrontIsLayerA = true;
+
+function showBackground(bg) {
+  const layerA = document.getElementById('bg-layer');
+  const layerB = document.getElementById('bg-alt');
+  if (!layerA || !layerB) return;
+  const front = bgFrontIsLayerA ? layerA : layerB;
+  const back = bgFrontIsLayerA ? layerB : layerA;
   const img = new Image();
   img.onload = () => {
-    layer.style.backgroundImage = `url("${bg.file}")`;
-    layer.style.backgroundPosition = bg.pos;
+    back.style.backgroundImage = `url("${bg.file}")`;
+    back.style.backgroundPosition = bg.pos;
+    back.classList.add('show');
+    front.classList.remove('show');
+    bgFrontIsLayerA = !bgFrontIsLayerA;
+    bgCurrentFile = bg.file;
   };
   img.src = bg.file;
+}
+
+/* 每 BG_ROTATE_MS 自动换一张；页面切到后台时暂停，回来继续 */
+const BG_ROTATE_MS = 10000;
+
+function startBackgroundRotation() {
+  const next = () => {
+    let bg;
+    do {
+      bg = BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)];
+    } while (BACKGROUNDS.length > 1 && bg.file === bgCurrentFile);
+    showBackground(bg);
+  };
+  let timer = setInterval(next, BG_ROTATE_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      clearInterval(timer);
+      timer = null;
+    } else if (!timer) {
+      timer = setInterval(next, BG_ROTATE_MS);
+    }
+  });
 }
 
 /* ==================== 状态 ==================== */

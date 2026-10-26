@@ -146,6 +146,8 @@ const state = {
   storageOk: true,
   profileName: '默认',
   profiles: null,    // { current, names: [] }
+  manageMode: false, // 批量管理模式
+  selectedIds: new Set(),
   data: null,
 };
 
@@ -361,6 +363,83 @@ function renderMonthSwitchers() {
     .forEach(el => { el.innerHTML = monthSwitcherHTML(); });
 }
 
+/* ==================== 批量删除 ==================== */
+let batchDeleteArmed = false;
+let batchDeleteTimer = null;
+
+function enterManageMode() {
+  state.manageMode = true;
+  state.selectedIds.clear();
+  resetBatchDelete();
+  document.getElementById('fab-add').classList.add('hidden');
+  renderList();
+}
+
+function exitManageMode() {
+  if (!state.manageMode) return;
+  state.manageMode = false;
+  state.selectedIds.clear();
+  resetBatchDelete();
+  document.getElementById('fab-add').classList.remove('hidden');
+  renderList();
+}
+
+function resetBatchDelete() {
+  batchDeleteArmed = false;
+  clearTimeout(batchDeleteTimer);
+}
+
+function toggleSelect(id) {
+  if (state.selectedIds.has(id)) state.selectedIds.delete(id);
+  else state.selectedIds.add(id);
+  resetBatchDelete();
+  renderList();
+}
+
+function toggleSelectAll(records) {
+  const allSel = records.every(r => state.selectedIds.has(r.id));
+  if (allSel) records.forEach(r => state.selectedIds.delete(r.id));
+  else records.forEach(r => state.selectedIds.add(r.id));
+  resetBatchDelete();
+  renderList();
+}
+
+function onBatchDeleteClick() {
+  const n = state.selectedIds.size;
+  if (!n) { toast('请先选择要删除的账单'); return; }
+  if (!batchDeleteArmed) {
+    batchDeleteArmed = true;
+    clearTimeout(batchDeleteTimer);
+    batchDeleteTimer = setTimeout(() => { batchDeleteArmed = false; renderList(); }, 2500);
+    renderList();
+    return;
+  }
+  state.data.records = state.data.records.filter(r => !state.selectedIds.has(r.id));
+  saveData();
+  exitManageMode();
+  renderAll();
+  toast(`已删除 ${n} 笔账单`);
+}
+
+function manageBarHTML(records) {
+  if (!state.manageMode) {
+    return `<div class="manage-bar">
+      <span class="manage-hint">本月共 ${records.length} 笔</span>
+      <button class="manage-btn" id="btn-enter-manage">批量删除</button>
+    </div>`;
+  }
+  const n = records.filter(r => state.selectedIds.has(r.id)).length;
+  const allSel = n === records.length && n > 0;
+  return `<div class="manage-bar managing">
+    <button class="manage-btn" id="btn-select-all">${allSel ? '取消全选' : '全选'}</button>
+    <span class="manage-hint">已选 ${n} 笔</span>
+    <span class="manage-group">
+      <button class="manage-btn danger ${batchDeleteArmed ? 'armed' : ''}" id="btn-batch-del" ${n ? '' : 'disabled'}>${batchDeleteArmed ? '确认删除' : '删除'}</button>
+      <button class="manage-btn" id="btn-exit-manage">完成</button>
+    </span>
+  </div>`;
+}
+
 function renderList() {
   const records = recordsOfMonth(state.viewMonth);
   const { income, expense } = sumsOf(records);
@@ -408,7 +487,7 @@ function renderList() {
     }
     cur.records.push(r);
   }
-  listBox.innerHTML = groups.map(g => {
+  listBox.innerHTML = manageBarHTML(records) + groups.map(g => {
     const dayExpense = sumsOf(g.records).expense;
     return `
       <div class="day-group">
@@ -427,8 +506,12 @@ function rowHTML(r) {
   const sign = r.type === 'income' ? '+' : '-';
   const title = r.note ? esc(r.note) : c.name;
   const sub = r.note ? c.name : '';
+  const checked = state.manageMode && state.selectedIds.has(r.id);
+  const check = state.manageMode
+    ? `<div class="sel-check ${checked ? 'on' : ''}">${checked ? '✓' : ''}</div>` : '';
   return `
-    <div class="record-row" data-id="${r.id}" role="button" tabindex="0">
+    <div class="record-row ${state.manageMode ? 'selectable' : ''}" data-id="${r.id}" role="button" tabindex="0">
+      ${check}
       <div class="cat-badge" style="--c:${c.color}" title="${c.chara}">${catAvatarHTML(c)}</div>
       <div class="rec-main">
         <div class="rec-title">${title}</div>
@@ -841,10 +924,19 @@ function init() {
     renderAll();
   });
 
-  // 点击账单行 → 编辑
+  // 点击账单行 → 批量模式下选择，普通模式下编辑；管理条按钮
   document.getElementById('record-list').addEventListener('click', e => {
+    const barBtn = e.target.closest('.manage-btn');
+    if (barBtn) {
+      if (barBtn.id === 'btn-enter-manage') enterManageMode();
+      else if (barBtn.id === 'btn-exit-manage') exitManageMode();
+      else if (barBtn.id === 'btn-select-all') toggleSelectAll(recordsOfMonth(state.viewMonth));
+      else if (barBtn.id === 'btn-batch-del') onBatchDeleteClick();
+      return;
+    }
     const row = e.target.closest('.record-row');
     if (!row) return;
+    if (state.manageMode) { toggleSelect(row.dataset.id); return; }
     const rec = state.data.records.find(r => r.id === row.dataset.id);
     if (rec) openSheet(rec);
   });

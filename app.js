@@ -774,6 +774,164 @@ function importJSON(e) {
   reader.readAsText(file);
 }
 
+/* ==================== 云同步（GitHub 私密 Gist + 端到端加密） ==================== */
+const SYNC_KEY = 'ledger.sync.v1';
+const GIST_DESC = 'ledger-sync-store';
+
+function loadSyncStore() {
+  try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || {}; } catch (e) { return {}; }
+}
+function saveSyncStore(s) { localStorage.setItem(SYNC_KEY, JSON.stringify(s)); }
+
+function b64(u8) { return btoa(String.fromCharCode(...u8)); }
+function ub64(s) { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+
+async function ghGist(method, path, token, body) {
+  const r = await fetch('https://api.github.com' + path, {
+    method,
+    headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github+json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) {
+    let msg = 'HTTP ' + r.status;
+    try { const d = await r.json(); msg = d.message || msg; } catch (e) { /* ignore */ }
+    if (r.status === 401) msg = '令牌无效或已过期';
+    else if (r.status === 403) msg = '令牌权限不足（需要勾选 gist 权限）';
+    else if (r.status === 404) msg = '云端还没有同步数据（先在一台设备上上传）';
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+async function deriveKey(pass, salt) {
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
+    km, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+
+async function encryptForSync(pass, text) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(pass, salt);
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(text));
+  return { v: 1, salt: b64(salt), iv: b64(iv), ct: b64(new Uint8Array(ct)) };
+}
+
+async function decryptForSync(pass, env) {
+  const key = await deriveKey(pass, ub64(env.salt));
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ub64(env.iv) }, key, ub64(env.ct));
+  return new TextDecoder().decode(pt);
+}
+
+async function findSyncGist(token) {
+  const store = loadSyncStore();
+  if (store.gistId) {
+    try { return await ghGist('GET', '/gists/' + store.gistId, token); }
+    catch (e) { if (!String(e.message).includes('不存在')) throw e; }
+  }
+  const gists = await ghGist('GET', '/gists?per_page=100', token);
+  const hit = gists.find(g => g.description === GIST_DESC);
+  if (hit) { store.gistId = hit.id; saveSyncStore(store); }
+  return hit || null;
+}
+
+function buildSyncPayload() {
+  const payload = { time: Date.now(), profiles: {} };
+  for (const name of state.profiles.names) {
+    const raw = name === state.profileName
+      ? state.data
+      : JSON.parse(localStorage.getItem(dataKey(name)) || 'null');
+    if (raw) payload.profiles[name] = raw;
+  }
+  return payload;
+}
+
+async function syncUpload() {
+  const s = loadSyncStore();
+  if (!s.token || !s.pass) { toast('请先填写并保存令牌和同步密码'); return; }
+  try {
+    const env = await encryptForSync(s.pass, JSON.stringify(buildSyncPayload()));
+    const files = {
+      'ledger.enc': { content: JSON.stringify(env) },
+      'ledger.meta': { content: JSON.stringify({ app: 'ledger', v: 1, time: env.time || Date.now() }) },
+    };
+    const existing = await findSyncGist(s.token);
+    if (existing) {
+      await ghGist('PATCH', '/gists/' + existing.id, s.token, { files });
+    } else {
+      const g = await ghGist('POST', '/gists', s.token, { description: GIST_DESC, public: false, files });
+      const st = loadSyncStore(); st.gistId = g.id; saveSyncStore(st);
+    }
+    s.lastUp = Date.now(); saveSyncStore(s);
+    renderSyncCard();
+    toast('已上传到云端 ✓');
+  } catch (e) { toast('上传失败：' + e.message); }
+}
+
+async function fetchCloudPayload() {
+  const s = loadSyncStore();
+  const gist = await findSyncGist(s.token);
+  if (!gist || !gist.files['ledger.enc']) throw new Error('云端还没有同步数据（先在一台设备上上传）');
+  const env = JSON.parse(gist.files['ledger.enc'].content);
+  let payload;
+  try {
+    payload = JSON.parse(await decryptForSync(s.pass, env));
+  } catch (e) {
+    throw new Error('解密失败，同步密码不对');
+  }
+  if (!payload || !payload.profiles) throw new Error('云端数据格式不正确');
+  return payload;
+}
+
+async function syncDownload() {
+  const s = loadSyncStore();
+  if (!s.token || !s.pass) { toast('请先填写并保存令牌和同步密码'); return; }
+  try {
+    const payload = await fetchCloudPayload();
+    const names = new Set(state.profiles.names);
+    for (const [name, data] of Object.entries(payload.profiles)) {
+      localStorage.setItem(dataKey(name), JSON.stringify(data));
+      names.add(name);
+    }
+    state.profiles.names = [...names];
+    saveProfiles();
+    loadData();
+    s.lastDown = Date.now(); saveSyncStore(s);
+    renderAll();
+    toast('已从云端同步 ✓');
+  } catch (e) {
+    toast('下载失败：' + e.message);
+  }
+}
+
+let syncDownArmed = false;
+let syncDownTimer = null;
+
+function renderSyncCard() {
+  const box = document.getElementById('sync-body');
+  if (!box) return;
+  const s = loadSyncStore();
+  const configured = !!(s.token && s.pass);
+  const fmtT = t => t ? new Date(t).toLocaleString('zh-CN', { hour12: false }) : '从未';
+  box.innerHTML = `
+    <div class="profile-form">
+      <input id="sync-token" type="password" placeholder="GitHub 令牌（只需 gist 权限）" value="${esc(s.token || '')}" autocomplete="off">
+      <input id="sync-pass" type="password" placeholder="同步密码（两端一致）" value="${esc(s.pass || '')}" autocomplete="off">
+      <button id="btn-sync-save" class="btn-mini">保存</button>
+    </div>
+    ${configured ? `
+    <div class="sync-status">已连接云端 · 上传 ${fmtT(s.lastUp)} · 下载 ${fmtT(s.lastDown)}</div>
+    <div class="sync-actions">
+      <button class="manage-btn" id="btn-sync-up">上传到云端</button>
+      <button class="manage-btn danger ${syncDownArmed ? 'armed' : ''}" id="btn-sync-down">${syncDownArmed ? '确认用云端覆盖本机' : '从云端下载'}</button>
+      <button class="manage-btn" id="btn-sync-reset">断开</button>
+    </div>` : `
+    <div class="sync-status">填好令牌和密码并保存后，在另一台设备填同样的内容即可同步。令牌生成：
+      <a href="https://github.com/settings/tokens/new?scopes=gist&description=ledger-sync" target="_blank" rel="noopener">点这里（已预选 gist 权限）</a></div>`}
+    <div class="card-hint">数据用同步密码加密后才上传，密码和令牌只保存在本机浏览器，不上传、不写入软件。上传=用本机覆盖云端；下载=用云端覆盖本机。</div>`;
+}
+
 /* ==================== 背景音乐 ==================== */
 const MUSIC = { file: 'assets/music/bgm.mp3', title: '繁星，新生，与你 Astrum Unicum' };
 
@@ -970,6 +1128,41 @@ function init() {
   document.getElementById('btn-profile-add').addEventListener('click', addProfile);
   document.getElementById('profile-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') addProfile();
+  });
+
+  // 云同步
+  renderSyncCard();
+  document.getElementById('sync-body').addEventListener('click', async e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.id === 'btn-sync-save') {
+      const s = loadSyncStore();
+      s.token = document.getElementById('sync-token').value.trim();
+      s.pass = document.getElementById('sync-pass').value;
+      if (!s.token || !s.pass) { toast('令牌和密码都要填'); return; }
+      saveSyncStore(s);
+      renderSyncCard();
+      toast('已保存，可以同步了');
+    } else if (btn.id === 'btn-sync-up') {
+      await syncUpload();
+    } else if (btn.id === 'btn-sync-down') {
+      if (!syncDownArmed) {
+        syncDownArmed = true;
+        clearTimeout(syncDownTimer);
+        syncDownTimer = setTimeout(() => { syncDownArmed = false; renderSyncCard(); }, 2500);
+        renderSyncCard();
+      } else {
+        syncDownArmed = false;
+        clearTimeout(syncDownTimer);
+        renderSyncCard();
+        await syncDownload();
+      }
+    } else if (btn.id === 'btn-sync-reset') {
+      localStorage.removeItem(SYNC_KEY);
+      syncDownArmed = false;
+      renderSyncCard();
+      toast('已断开（本机令牌已清除，云端数据保留）');
+    }
   });
 
   switchTab('list');

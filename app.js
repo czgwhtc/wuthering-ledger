@@ -277,7 +277,7 @@ function deleteProfile(name) {
 
 /* ==================== 存储层（按账本分键） ==================== */
 function defaultData() {
-  return { version: 1, records: [], settings: { monthlyBudget: 0 } };
+  return { version: 1, records: [], settings: { monthlyBudget: 0 }, deleted: {} };
 }
 
 function isValidRecord(r) {
@@ -297,10 +297,18 @@ function normalizeData(obj) {
       date: r.date,
       note: String(r.note || '').slice(0, 100),
       createdAt: +r.createdAt || Date.now(),
+      updatedAt: +r.updatedAt || +r.createdAt || Date.now(),
     }));
   }
   if (obj && obj.settings && isFinite(+obj.settings.monthlyBudget)) {
     data.settings.monthlyBudget = Math.max(0, Math.round(+obj.settings.monthlyBudget));
+    data.settings.budgetUpdatedAt = +obj.settings.budgetUpdatedAt || 0;
+  }
+  if (obj && obj.deleted && typeof obj.deleted === 'object') {
+    data.deleted = {};
+    for (const [id, t] of Object.entries(obj.deleted)) {
+      if (+t) data.deleted[id] = +t;
+    }
   }
   return data;
 }
@@ -318,6 +326,7 @@ function loadData() {
 function saveData() {
   try {
     localStorage.setItem(dataKey(), JSON.stringify(state.data));
+    scheduleAutoSync();
   } catch (e) {
     state.storageOk = false;
   }
@@ -414,6 +423,8 @@ function onBatchDeleteClick() {
     renderList();
     return;
   }
+  state.data.deleted = state.data.deleted || {};
+  for (const id of state.selectedIds) state.data.deleted[id] = Date.now();
   state.data.records = state.data.records.filter(r => !state.selectedIds.has(r.id));
   saveData();
   exitManageMode();
@@ -680,11 +691,11 @@ function saveSheet() {
 
   if (state.editingId) {
     const r = state.data.records.find(r => r.id === state.editingId);
-    if (r) Object.assign(r, { type: state.sheetType, amountCents: cents, category: state.sheetCat, date, note });
+    if (r) Object.assign(r, { type: state.sheetType, amountCents: cents, category: state.sheetCat, date, note, updatedAt: Date.now() });
   } else {
     state.data.records.push({
       id: uid(), type: state.sheetType, amountCents: cents,
-      category: state.sheetCat, date, note, createdAt: Date.now(),
+      category: state.sheetCat, date, note, createdAt: Date.now(), updatedAt: Date.now(),
     });
   }
   saveData();
@@ -713,6 +724,8 @@ function onDeleteClick() {
     deleteTimer = setTimeout(resetDeleteBtn, 2500);
     return;
   }
+  state.data.deleted = state.data.deleted || {};
+  state.data.deleted[state.editingId] = Date.now();
   state.data.records = state.data.records.filter(r => r.id !== state.editingId);
   saveData();
   closeSheet();
@@ -837,7 +850,7 @@ async function findSyncGist(token) {
 }
 
 function buildSyncPayload() {
-  const payload = { time: Date.now(), profiles: {} };
+  const payload = { time: Date.now(), profiles: {}, deletedProfiles: state.profiles.deletedProfiles || {} };
   for (const name of state.profiles.names) {
     const raw = name === state.profileName
       ? state.data
@@ -847,26 +860,115 @@ function buildSyncPayload() {
   return payload;
 }
 
-async function syncUpload() {
+/* ---------- 合并：并集 + 新者胜 + 墓碑 ---------- */
+const recTime = r => +r.updatedAt || +r.createdAt || 0;
+const TOMBSTONE_TTL = 90 * 24 * 3600 * 1000;
+
+function mergeProfileData(local, remote) {
+  if (!remote) return local;
+  if (!local) return remote;
+  const deleted = {};
+  for (const [id, t] of Object.entries({ ...(local.deleted || {}), ...(remote.deleted || {}) })) {
+    if (+t && Date.now() - +t < TOMBSTONE_TTL) deleted[id] = +t;
+  }
+  const map = new Map();
+  for (const r of [...(local.records || []), ...(remote.records || [])]) {
+    const prev = map.get(r.id);
+    if (!prev || recTime(r) >= recTime(prev)) map.set(r.id, r);
+  }
+  const records = [...map.values()].filter(r => {
+    const t = deleted[r.id];
+    return !(t && t >= recTime(r));
+  });
+  const lt = +(local.settings || {}).budgetUpdatedAt || 0;
+  const rt = +(remote.settings || {}).budgetUpdatedAt || 0;
+  const settings = rt > lt ? { ...(remote.settings || {}) } : { ...(local.settings || {}) };
+  return { version: 1, records, settings, deleted };
+}
+
+let syncBusy = false, syncQueued = false, syncDebounceTimer = null, syncLastError = '';
+
+async function pushPayload() {
   const s = loadSyncStore();
-  if (!s.token || !s.pass) { toast('请先填写并保存令牌和同步密码'); return; }
+  const env = await encryptForSync(s.pass, JSON.stringify(buildSyncPayload()));
+  const files = {
+    'ledger.enc': { content: JSON.stringify(env) },
+    'ledger.meta': { content: JSON.stringify({ app: 'ledger', v: 1, time: Date.now() }) },
+  };
+  const existing = await findSyncGist(s.token);
+  if (existing) {
+    await ghGist('PATCH', '/gists/' + existing.id, s.token, { files });
+  } else {
+    const g = await ghGist('POST', '/gists', s.token, { description: GIST_DESC, public: false, files });
+    const st = loadSyncStore(); st.gistId = g.id; saveSyncStore(st);
+  }
+}
+
+async function runSync(manual) {
+  const s = loadSyncStore();
+  if (!s.token || !s.pass) return;
+  if (syncBusy) { syncQueued = true; return; }
+  syncBusy = true;
   try {
-    const env = await encryptForSync(s.pass, JSON.stringify(buildSyncPayload()));
-    const files = {
-      'ledger.enc': { content: JSON.stringify(env) },
-      'ledger.meta': { content: JSON.stringify({ app: 'ledger', v: 1, time: env.time || Date.now() }) },
-    };
-    const existing = await findSyncGist(s.token);
-    if (existing) {
-      await ghGist('PATCH', '/gists/' + existing.id, s.token, { files });
-    } else {
-      const g = await ghGist('POST', '/gists', s.token, { description: GIST_DESC, public: false, files });
-      const st = loadSyncStore(); st.gistId = g.id; saveSyncStore(st);
+    // 拉取远端 → 合并 → 回写本地 → 推送合并结果
+    let payload = null;
+    try { payload = await fetchCloudPayload(); }
+    catch (e) {
+      if (!String(e.message).includes('还没有同步数据')) throw e;
     }
-    s.lastUp = Date.now(); saveSyncStore(s);
+    if (payload) {
+      const names = new Set(state.profiles.names);
+      const delProfiles = { ...(state.profiles.deletedProfiles || {}), ...(payload.deletedProfiles || {}) };
+      for (const [name, remote] of Object.entries(payload.profiles)) {
+        const local = name === state.profileName
+          ? state.data
+          : normalizeData(JSON.parse(localStorage.getItem(dataKey(name)) || 'null') || defaultData());
+        const merged = mergeProfileData(local, remote);
+        if (name === state.profileName && merged !== state.data) {
+          localStorage.setItem(dataKey(name), JSON.stringify(merged));
+        } else {
+          localStorage.setItem(dataKey(name), JSON.stringify(merged));
+        }
+        names.add(name);
+      }
+      state.profiles.names = [...names].filter(n => !delProfiles[n]);
+      state.profiles.deletedProfiles = delProfiles;
+      saveProfiles();
+      loadData();
+      renderAll();
+    }
+    await pushPayload();
+    s.lastSync = Date.now();
+    syncLastError = '';
+    saveSyncStore(s);
     renderSyncCard();
-    toast('已上传到云端 ✓');
-  } catch (e) { toast('上传失败：' + e.message); }
+    if (manual) toast('同步完成 ✓');
+  } catch (e) {
+    syncLastError = e.message;
+    renderSyncCard();
+    if (manual) toast('同步失败：' + e.message);
+  } finally {
+    syncBusy = false;
+    if (syncQueued) { syncQueued = false; scheduleAutoSync(800); }
+  }
+}
+
+function scheduleAutoSync(delay) {
+  const s = loadSyncStore();
+  if (!s.token || !s.pass || s.auto === false) return;
+  clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => runSync(false), delay || 4000);
+}
+
+function initAutoSync() {
+  const s = loadSyncStore();
+  if (!s.token || !s.pass) return;
+  if (s.auto === false) return;
+  scheduleAutoSync(1500);                 // 启动后先同步一次
+  setInterval(() => scheduleAutoSync(10), 5 * 60 * 1000);  // 每 5 分钟
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleAutoSync(500);
+  });
 }
 
 async function fetchCloudPayload() {
@@ -884,35 +986,12 @@ async function fetchCloudPayload() {
   return payload;
 }
 
-async function syncDownload() {
-  const s = loadSyncStore();
-  if (!s.token || !s.pass) { toast('请先填写并保存令牌和同步密码'); return; }
-  try {
-    const payload = await fetchCloudPayload();
-    const names = new Set(state.profiles.names);
-    for (const [name, data] of Object.entries(payload.profiles)) {
-      localStorage.setItem(dataKey(name), JSON.stringify(data));
-      names.add(name);
-    }
-    state.profiles.names = [...names];
-    saveProfiles();
-    loadData();
-    s.lastDown = Date.now(); saveSyncStore(s);
-    renderAll();
-    toast('已从云端同步 ✓');
-  } catch (e) {
-    toast('下载失败：' + e.message);
-  }
-}
-
-let syncDownArmed = false;
-let syncDownTimer = null;
-
 function renderSyncCard() {
   const box = document.getElementById('sync-body');
   if (!box) return;
   const s = loadSyncStore();
   const configured = !!(s.token && s.pass);
+  const autoOn = s.auto !== false;
   const fmtT = t => t ? new Date(t).toLocaleString('zh-CN', { hour12: false }) : '从未';
   box.innerHTML = `
     <div class="profile-form">
@@ -921,15 +1000,15 @@ function renderSyncCard() {
       <button id="btn-sync-save" class="btn-mini">保存</button>
     </div>
     ${configured ? `
-    <div class="sync-status">已连接云端 · 上传 ${fmtT(s.lastUp)} · 下载 ${fmtT(s.lastDown)}</div>
+    <div class="sync-status">${autoOn ? '🔄 自动同步已开启' : '⏸ 自动同步已暂停'} · 上次同步 ${fmtT(s.lastSync)}${syncLastError ? ' · <b style="color:var(--expense)">失败：' + esc(syncLastError) + '</b>' : ''}</div>
     <div class="sync-actions">
-      <button class="manage-btn" id="btn-sync-up">上传到云端</button>
-      <button class="manage-btn danger ${syncDownArmed ? 'armed' : ''}" id="btn-sync-down">${syncDownArmed ? '确认用云端覆盖本机' : '从云端下载'}</button>
+      <button class="manage-btn" id="btn-sync-now">立即同步</button>
+      <button class="manage-btn" id="btn-sync-auto">${autoOn ? '暂停自动' : '开启自动'}</button>
       <button class="manage-btn" id="btn-sync-reset">断开</button>
     </div>` : `
-    <div class="sync-status">填好令牌和密码并保存后，在另一台设备填同样的内容即可同步。令牌生成：
+    <div class="sync-status">填好令牌和密码并保存后自动开始同步。令牌生成：
       <a href="https://github.com/settings/tokens/new?scopes=gist&description=ledger-sync" target="_blank" rel="noopener">点这里（已预选 gist 权限）</a></div>`}
-    <div class="card-hint">数据用同步密码加密后才上传，密码和令牌只保存在本机浏览器，不上传、不写入软件。上传=用本机覆盖云端；下载=用云端覆盖本机。</div>`;
+    <div class="card-hint">多设备同时记账会自动合并：新增合并、编辑取较新、删除保留。数据加密后存你的私密 Gist，令牌密码只存本机。</div>`;
 }
 
 /* ==================== 背景音乐 ==================== */
@@ -1104,6 +1183,7 @@ function init() {
     const cents = raw === '' ? 0 : parseYuanToCents(raw);
     if (raw !== '' && cents === null) { toast('预算金额不正确'); return; }
     state.data.settings.monthlyBudget = cents || 0;
+    state.data.settings.budgetUpdatedAt = Date.now();
     saveData();
     renderAll();
     toast(cents ? '预算已保存' : '已关闭预算提醒');
@@ -1142,24 +1222,20 @@ function init() {
       if (!s.token || !s.pass) { toast('令牌和密码都要填'); return; }
       saveSyncStore(s);
       renderSyncCard();
-      toast('已保存，可以同步了');
-    } else if (btn.id === 'btn-sync-up') {
-      await syncUpload();
-    } else if (btn.id === 'btn-sync-down') {
-      if (!syncDownArmed) {
-        syncDownArmed = true;
-        clearTimeout(syncDownTimer);
-        syncDownTimer = setTimeout(() => { syncDownArmed = false; renderSyncCard(); }, 2500);
-        renderSyncCard();
-      } else {
-        syncDownArmed = false;
-        clearTimeout(syncDownTimer);
-        renderSyncCard();
-        await syncDownload();
-      }
+      toast('已保存，自动同步将开始');
+      scheduleAutoSync(1500);
+    } else if (btn.id === 'btn-sync-now') {
+      await runSync(true);
+    } else if (btn.id === 'btn-sync-auto') {
+      const s = loadSyncStore();
+      s.auto = s.auto === false;
+      saveSyncStore(s);
+      renderSyncCard();
+      if (s.auto === false) { clearTimeout(syncDebounceTimer); toast('已暂停自动同步'); }
+      else { toast('已开启自动同步'); scheduleAutoSync(500); }
     } else if (btn.id === 'btn-sync-reset') {
       localStorage.removeItem(SYNC_KEY);
-      syncDownArmed = false;
+      clearTimeout(syncDebounceTimer);
       renderSyncCard();
       toast('已断开（本机令牌已清除，云端数据保留）');
     }
@@ -1167,6 +1243,7 @@ function init() {
 
   switchTab('list');
   renderAll();
+  initAutoSync();
   if (!state.storageOk) toast('注意：当前浏览器无法保存数据');
 }
 

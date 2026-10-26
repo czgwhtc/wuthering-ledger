@@ -4,7 +4,9 @@
 
 ## 使用方法
 
-双击 `index.html`，用 Chrome / Edge 等现代浏览器打开即可使用，无需安装、无需联网。手机浏览器打开同样适配。
+**在线版**：https://czgwhtc.github.io/wuthering-ledger/ （手机电脑浏览器直接打开；每个浏览器的账单相互独立）
+
+**本地版**：双击 `index.html`，用 Chrome / Edge 等现代浏览器打开即可使用，无需安装、无需联网。手机浏览器打开同样适配。
 
 ## 功能
 

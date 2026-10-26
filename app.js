@@ -17,7 +17,7 @@ const CATEGORIES = {
   ],
   income: [
     { key: 'salary',  name: '工资', icon: '💰', color: '#22c55e', chara: '景燃',     avatar: 'assets/chara/av-salary.png' },
-    { key: 'bonus',   name: '奖金', icon: '🎁', color: '#eab308', chara: '今汐',     avatar: 'assets/chara/av-bonus.png' },
+    { key: 'bonus',   name: '奖金', icon: '🎁', color: '#eab308', chara: '锁暝',     avatar: 'assets/chara/av-bonus.png' },
     { key: 'invest',  name: '理财', icon: '📈', color: '#06b6d4', chara: '坎特蕾拉', avatar: 'assets/chara/av-invest.png' },
     { key: 'sidejob', name: '兼职', icon: '💼', color: '#a855f7', chara: '清宵',     avatar: 'assets/chara/av-sidejob.png' },
     { key: 'other',   name: '其他', icon: '📥', color: '#94a3b8', chara: '尤诺',     avatar: 'assets/chara/av-income-other.png' },
@@ -43,13 +43,47 @@ function catOf(type, key) {
     { key: 'other', name: '未知', icon: '❔', color: '#94a3b8' };
 }
 
-/* ==================== 背景图（鸣潮官方壁纸，随机展示） ==================== */
+/* ==================== 背景图（39 位五星限定角色官方海报，随机展示） ==================== */
 const BACKGROUNDS = [
-  { file: 'assets/bg-1.jpg', pos: '42% 40%' },  // 三人合影，主体偏左
-  { file: 'assets/bg-2.jpg', pos: '58% 45%' },  // 双人暖黄，主体偏右
-  { file: 'assets/bg-3.jpg', pos: '50% 40%' },  // 水下场景，主体居中
-  { file: 'assets/bg-4.jpg', pos: '55% 45%' },  // 红黑对峙，主体略偏右
-  { file: 'assets/bg-5.jpg', pos: '50% 40%' },  // 单人紫发，主体居中
+  { file: 'assets/bg-01.jpg', pos: '50% 30%' }, // 忌炎
+  { file: 'assets/bg-02.jpg', pos: '50% 30%' }, // 吟霖
+  { file: 'assets/bg-03.jpg', pos: '50% 30%' }, // 今汐
+  { file: 'assets/bg-04.jpg', pos: '50% 30%' }, // 长离
+  { file: 'assets/bg-05.jpg', pos: '50% 30%' }, // 折枝
+  { file: 'assets/bg-06.jpg', pos: '50% 30%' }, // 相里要
+  { file: 'assets/bg-07.jpg', pos: '50% 30%' }, // 椿
+  { file: 'assets/bg-08.jpg', pos: '50% 30%' }, // 守岸人
+  { file: 'assets/bg-09.jpg', pos: '50% 30%' }, // 珂莱塔
+  { file: 'assets/bg-10.jpg', pos: '50% 30%' }, // 洛可可
+  { file: 'assets/bg-11.jpg', pos: '50% 30%' }, // 菲比
+  { file: 'assets/bg-12.jpg', pos: '50% 30%' }, // 布兰特
+  { file: 'assets/bg-13.jpg', pos: '50% 30%' }, // 坎特蕾拉
+  { file: 'assets/bg-14.webp', pos: '50% 30%' }, // 赞妮
+  { file: 'assets/bg-15.webp', pos: '50% 30%' }, // 夏空
+  { file: 'assets/bg-16.webp', pos: '50% 30%' }, // 卡提希娅
+  { file: 'assets/bg-17.webp', pos: '50% 30%' }, // 露帕
+  { file: 'assets/bg-18.webp', pos: '50% 30%' }, // 弗洛洛
+  { file: 'assets/bg-19.webp', pos: '50% 30%' }, // 奥古斯塔
+  { file: 'assets/bg-20.webp', pos: '50% 30%' }, // 尤诺
+  { file: 'assets/bg-21.webp', pos: '50% 30%' }, // 嘉贝莉娜
+  { file: 'assets/bg-22.webp', pos: '50% 30%' }, // 仇远
+  { file: 'assets/bg-23.webp', pos: '50% 30%' }, // 千咲
+  { file: 'assets/bg-24.webp', pos: '50% 30%' }, // 琳奈
+  { file: 'assets/bg-25.webp', pos: '50% 30%' }, // 莫宁
+  { file: 'assets/bg-26.webp', pos: '50% 30%' }, // 爱弥斯
+  { file: 'assets/bg-27.webp', pos: '50% 30%' }, // 陆赫斯
+  { file: 'assets/bg-28.webp', pos: '50% 30%' }, // 西格莉卡
+  { file: 'assets/bg-29.webp', pos: '50% 30%' }, // 绯雪
+  { file: 'assets/bg-30.webp', pos: '50% 30%' }, // 达妮娅
+  { file: 'assets/bg-31.webp', pos: '50% 30%' }, // 丽贝卡
+  { file: 'assets/bg-32.webp', pos: '50% 30%' }, // 露西
+  { file: 'assets/bg-33.webp', pos: '50% 30%' }, // 洛瑟菈
+  { file: 'assets/bg-34.webp', pos: '50% 30%' }, // 穗穗
+  { file: 'assets/bg-35.webp', pos: '50% 30%' }, // 清宵
+  { file: 'assets/bg-36.webp', pos: '50% 30%' }, // 景燃
+  { file: 'assets/bg-37.webp', pos: '50% 30%' }, // 心
+  { file: 'assets/bg-38.webp', pos: '50% 30%' }, // 秧秧·玄翎
+  { file: 'assets/bg-39.webp', pos: '50% 30%' }, // 锁暝
 ];
 
 function applyRandomBackground() {

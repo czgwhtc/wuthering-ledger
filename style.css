@@ -154,7 +154,30 @@ main { padding: 18px 16px 130px; }
 .chart-legend .dot { margin-right: 5px; }
 .empty-chart { text-align: center; color: var(--muted); font-size: 13px; padding: 30px 0; }
 
-/* ---------- 我的 ---------- */
+/* ---------- 账本管理 ---------- */
+.profile-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 2px; border-bottom: 1px solid rgba(20, 30, 60, .08); font-size: 14px;
+}
+.profile-row:last-child { border-bottom: none; }
+.profile-row.current .profile-name { font-weight: 700; color: var(--primary); }
+.profile-cur { font-size: 12px; color: var(--muted); margin-left: 6px; }
+.profile-btn {
+  border: 1px solid rgba(20, 30, 60, .15); background: rgba(255, 255, 255, .5);
+  border-radius: 8px; font-size: 12px; padding: 4px 11px; cursor: pointer; margin-left: 6px;
+  color: var(--text);
+}
+.profile-btn.danger { color: var(--expense); border-color: #ffc9c9; background: rgba(255, 245, 245, .6); }
+.profile-btn.armed { background: var(--expense); color: #fff; border-color: var(--expense); }
+.profile-form { display: flex; gap: 8px; margin-top: 10px; }
+.profile-form input {
+  flex: 1; min-width: 0; height: 40px; border: 1px solid var(--border);
+  border-radius: 10px; padding: 0 12px; font-size: 14px; outline: none;
+  background: rgba(255, 255, 255, .5);
+}
+.profile-form input:focus { border-color: var(--primary); }
+
+/* ---------- 预算 ---------- */
 .budget-form { display: flex; align-items: center; gap: 8px; }
 .budget-form .yuan { font-size: 16px; font-weight: 700; color: var(--muted); }
 .budget-form input {

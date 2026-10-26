@@ -2,6 +2,7 @@
 
 /* ==================== 常量与分类 ==================== */
 const STORAGE_KEY = 'ledger.data.v1';
+const PROFILE_KEY = 'ledger.profiles.v1';
 
 /* 分类配置：icon 是图片缺失时的 emoji 兜底；chara/avatar 是角色头像 */
 const CATEGORIES = {
@@ -143,6 +144,8 @@ const state = {
   sheetType: 'expense',
   sheetCat: null,
   storageOk: true,
+  profileName: '默认',
+  profiles: null,    // { current, names: [] }
   data: null,
 };
 
@@ -204,7 +207,73 @@ function stamp() {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
-/* ==================== 存储层 ==================== */
+/* ==================== 多账本（每人数据独立） ==================== */
+function dataKey(name) { return STORAGE_KEY + '::' + (name || state.profileName); }
+
+function loadProfiles() {
+  let p = null;
+  try {
+    p = JSON.parse(localStorage.getItem(PROFILE_KEY));
+  } catch (e) { /* ignore */ }
+  if (p && Array.isArray(p.names) && p.names.length && p.names.includes(p.current)) {
+    state.profiles = p;
+  } else {
+    // 首次升级：把旧的单账本数据迁移到「默认」账本
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      try { localStorage.setItem(STORAGE_KEY + '::默认', raw); } catch (e) { /* ignore */ }
+    }
+    state.profiles = { current: '默认', names: ['默认'] };
+    saveProfiles();
+  }
+  state.profileName = state.profiles.current;
+}
+
+function saveProfiles() {
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profiles)); }
+  catch (e) { state.storageOk = false; }
+}
+
+function switchProfile(name) {
+  saveData();  // 保存当前账本
+  state.profileName = name;
+  state.profiles.current = name;
+  saveProfiles();
+  loadData();
+  state.viewMonth = todayStr().slice(0, 7);
+  closeSheet();
+  switchTab('list');
+  renderAll();
+  toast(`已切换到「${name}」账本`);
+}
+
+function createProfile(name) {
+  name = name.trim().slice(0, 12);
+  if (!name) { toast('请输入账本名字'); return; }
+  if (state.profiles.names.includes(name)) { toast('这个名字已存在'); return; }
+  state.profiles.names.push(name);
+  saveProfiles();
+  switchProfile(name);
+  toast(`已创建「${name}」账本`);
+}
+
+function deleteProfile(name) {
+  if (state.profiles.names.length <= 1) { toast('至少保留一个账本'); return; }
+  state.profiles.names = state.profiles.names.filter(n => n !== name);
+  try { localStorage.removeItem(dataKey(name)); } catch (e) { /* ignore */ }
+  if (state.profileName === name) {
+    state.profileName = state.profiles.names[0];
+    state.profiles.current = state.profileName;
+    saveProfiles();
+    loadData();
+  } else {
+    saveProfiles();
+  }
+  renderAll();
+  toast(`已删除「${name}」账本`);
+}
+
+/* ==================== 存储层（按账本分键） ==================== */
 function defaultData() {
   return { version: 1, records: [], settings: { monthlyBudget: 0 } };
 }
@@ -236,7 +305,7 @@ function normalizeData(obj) {
 
 function loadData() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(dataKey());
     state.data = raw ? normalizeData(JSON.parse(raw)) : defaultData();
   } catch (e) {
     state.storageOk = false;
@@ -246,7 +315,7 @@ function loadData() {
 
 function saveData() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+    localStorage.setItem(dataKey(), JSON.stringify(state.data));
   } catch (e) {
     state.storageOk = false;
   }
@@ -274,6 +343,7 @@ function renderAll() {
   renderList();
   renderCharts();
   renderMe();
+  renderProfiles();
 }
 
 function monthSwitcherHTML() {
@@ -470,8 +540,8 @@ function renderMe() {
   }
   const dates = state.data.records.map(r => r.date).sort();
   document.getElementById('me-stats').textContent = dates.length
-    ? `共 ${dates.length} 笔账单 · ${dates[0]} ~ ${dates[dates.length - 1]}`
-    : '还没有任何账单';
+    ? `账本「${state.profileName}」· 共 ${dates.length} 笔 · ${dates[0]} ~ ${dates[dates.length - 1]}`
+    : `账本「${state.profileName}」· 还没有任何账单`;
   document.getElementById('storage-warn').classList.toggle('hidden', state.storageOk);
 }
 
@@ -581,7 +651,7 @@ function downloadFile(name, content, mime) {
 }
 
 function exportJSON() {
-  downloadFile(`记账备份_${stamp()}.json`, JSON.stringify(state.data, null, 2), 'application/json');
+  downloadFile(`记账备份_${state.profileName}_${stamp()}.json`, JSON.stringify(state.data, null, 2), 'application/json');
   toast('已导出备份文件');
 }
 
@@ -670,6 +740,49 @@ function initMusic() {
   render();
 }
 
+let profileDeleteArmed = null;
+let profileDeleteTimer = null;
+
+function renderProfiles() {
+  const box = document.getElementById('profile-list');
+  if (!box || !state.profiles) return;
+  box.innerHTML = state.profiles.names.map(n => {
+    const cur = n === state.profileName;
+    const armed = profileDeleteArmed === n;
+    return `
+    <div class="profile-row ${cur ? 'current' : ''}">
+      <span class="profile-name">${cur ? '📍 ' : ''}${esc(n)}</span>
+      <span class="profile-actions">
+        ${cur ? '<span class="profile-cur">当前</span>'
+              : `<button class="profile-btn" data-act="use" data-name="${esc(n)}">切换</button>`}
+        ${state.profiles.names.length > 1
+          ? `<button class="profile-btn danger ${armed ? 'armed' : ''}" data-act="del" data-name="${esc(n)}">${armed ? '确认' : '删除'}</button>` : ''}
+      </span>
+    </div>`;
+  }).join('');
+}
+
+function onProfileAction(btn) {
+  const act = btn.dataset.act;
+  const name = btn.dataset.name;
+  if (act === 'use') {
+    profileDeleteArmed = null;
+    clearTimeout(profileDeleteTimer);
+    switchProfile(name);
+  } else if (act === 'del') {
+    if (profileDeleteArmed !== name) {
+      profileDeleteArmed = name;
+      clearTimeout(profileDeleteTimer);
+      profileDeleteTimer = setTimeout(() => { profileDeleteArmed = null; renderProfiles(); }, 2500);
+      renderProfiles();
+    } else {
+      profileDeleteArmed = null;
+      clearTimeout(profileDeleteTimer);
+      deleteProfile(name);
+    }
+  }
+}
+
 /* ==================== 交互与初始化 ==================== */
 function switchTab(tab) {
   state.tab = tab;
@@ -695,6 +808,7 @@ function shake(id) {
 }
 
 function init() {
+  loadProfiles();
   loadData();
   applyRandomBackground();
   initMusic();
@@ -750,6 +864,21 @@ function init() {
   document.getElementById('btn-import').addEventListener('click', () =>
     document.getElementById('import-file').click());
   document.getElementById('import-file').addEventListener('change', importJSON);
+
+  // 账本管理
+  document.getElementById('profile-list').addEventListener('click', e => {
+    const btn = e.target.closest('.profile-btn');
+    if (btn) onProfileAction(btn);
+  });
+  const addProfile = () => {
+    const input = document.getElementById('profile-input');
+    createProfile(input.value);
+    input.value = '';
+  };
+  document.getElementById('btn-profile-add').addEventListener('click', addProfile);
+  document.getElementById('profile-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addProfile();
+  });
 
   switchTab('list');
   renderAll();

@@ -550,6 +550,55 @@ function importJSON(e) {
   reader.readAsText(file);
 }
 
+/* ==================== 背景音乐 ==================== */
+const MUSIC = { file: 'assets/music/bgm.mp3', title: '繁星，新生，与你 Astrum Unicum' };
+
+function initMusic() {
+  const btn = document.getElementById('music-btn');
+  const audio = new Audio(MUSIC.file);
+  audio.loop = true;
+  audio.volume = 0.55;
+
+  audio.addEventListener('error', () => btn.classList.add('hidden'), { once: true });
+
+  let started = false;
+  let wantMusic = localStorage.getItem('ledger.music') !== 'off';
+
+  const render = () => {
+    btn.classList.toggle('playing', !audio.paused);
+    btn.classList.toggle('paused', audio.paused);
+  };
+
+  const tryPlay = () => {
+    audio.play().then(() => {
+      render();
+      if (!started) { started = true; toast('♪ ' + MUSIC.title); }
+    }).catch(() => {});
+  };
+
+  // 浏览器要求用户交互后才能出声：首次任意点击开始播放
+  document.addEventListener('pointerdown', () => {
+    if (!started && wantMusic) tryPlay();
+  }, { once: true });
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (audio.paused) {
+      wantMusic = true;
+      localStorage.setItem('ledger.music', 'on');
+      tryPlay();
+    } else {
+      wantMusic = false;
+      localStorage.setItem('ledger.music', 'off');
+      audio.pause();
+      render();
+    }
+  });
+  audio.addEventListener('play', render);
+  audio.addEventListener('pause', render);
+  render();
+}
+
 /* ==================== 交互与初始化 ==================== */
 function switchTab(tab) {
   state.tab = tab;
@@ -577,6 +626,7 @@ function shake(id) {
 function init() {
   loadData();
   applyRandomBackground();
+  initMusic();
 
   document.querySelectorAll('.tab-btn')
     .forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));

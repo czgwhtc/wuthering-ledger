@@ -43,6 +43,39 @@
       <div class="card" id="bars-card"></div>
     </section>
 
+    <!-- 设置 -->
+    <section class="view" id="view-settings">
+      <div class="page-title">设置</div>
+      <div class="card">
+        <div class="card-title">周期账单</div>
+        <div class="set-row">
+          <div>
+            <div class="set-name">开启周期账单</div>
+            <div class="set-desc">每月自动记入固定支出（房租、订阅等），到日记一笔</div>
+          </div>
+          <div class="switch" id="sw-recurring" role="switch" tabindex="0"></div>
+        </div>
+        <div id="recurring-list"></div>
+        <div class="rec-form">
+          <input id="rec-name" type="text" maxlength="12" placeholder="名称，如 房租">
+          <input id="rec-amount" type="number" inputmode="decimal" placeholder="金额" style="max-width:86px">
+          <input id="rec-day" type="number" min="1" max="28" placeholder="几号" style="max-width:62px">
+          <select id="rec-cat" class="sync-select" style="max-width:96px"></select>
+          <button id="btn-rec-add" class="btn-mini">添加</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">预算结转</div>
+        <div class="set-row">
+          <div>
+            <div class="set-name">剩余日预算结转</div>
+            <div class="set-desc">今天没花完的日预算自动攒给后面几天；前面超支也会摊薄后续额度（按当月累计盈亏计算）</div>
+          </div>
+          <div class="switch" id="sw-rollover" role="switch" tabindex="0"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- 我的 -->
     <section class="view" id="view-me">
       <div class="page-title">我的</div>
@@ -82,8 +115,10 @@
       <div class="card">
         <div class="card-title">关于</div>
         <div class="card-hint">
-          记账本 v3.0 · 鸣潮主题记账<br>
+          记账本 v4.0 · 鸣潮主题记账<br>
           · 每日明细：进入即看当天账单，可翻任意日期<br>
+          · 周期账单：房租/订阅每月自动记入（设置里开关）<br>
+          · 日预算支持剩余额度结转（设置里开关）<br>
           · 39 位五星限定角色官方海报轮换，每 10 秒换一张<br>
           · 分类头像与角色立绘来自鸣潮 BWIKI / 官网（版权归库洛游戏所有）<br>
           · 背景音乐《繁星，新生，与你 Astrum Unicum》<br>
@@ -111,6 +146,9 @@
     </button>
     <button class="tab-btn" data-tab="charts">
       <svg viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg><span>图表</span>
+    </button>
+    <button class="tab-btn" data-tab="settings">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.2"/><circle cx="15" cy="12" r="2.2"/><circle cx="7" cy="18" r="2.2"/></svg><span>设置</span>
     </button>
     <button class="tab-btn" data-tab="me">
       <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>我的</span>

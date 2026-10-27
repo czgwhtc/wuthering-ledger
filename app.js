@@ -1301,6 +1301,16 @@ function pickRandomCharaArt() {
   img.style.animation = '';
 }
 
+/* 立绘统一按固定高度显示：宽构图（爱弥斯/心等近方形）会等比放大，
+   多出的宽度向左溢出到表单下方，视觉大小与窄长构图一致 */
+function sizeCharaArt(img) {
+  const natW = img.naturalWidth, natH = img.naturalHeight;
+  if (!natW || !natH) return;
+  const targetH = window.innerWidth <= 400 ? 190 : 230;
+  img.style.width = Math.round(targetH * natW / natH) + 'px';
+  img.style.height = targetH + 'px';
+}
+
 function closeSheet() {
   document.getElementById('sheet-wrap').classList.remove('open');
   state.editingId = null;
@@ -2061,8 +2071,9 @@ function init() {
   document.querySelectorAll('.back-btn').forEach(el =>
     el.addEventListener('click', closeSub));
 
-  // 记一笔弹层：点立绘换一张
+  // 记一笔弹层：点立绘换一张；换图/加载后按统一高度排版
   document.querySelector('.sheet-chara').addEventListener('click', pickRandomCharaArt);
+  document.getElementById('chara-art').addEventListener('load', e => sizeCharaArt(e.target));
 
   switchTab('day');
   renderAll();

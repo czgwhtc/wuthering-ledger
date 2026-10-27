@@ -980,8 +980,7 @@ function scheduleAutoSync(delay) {
   syncDebounceTimer = setTimeout(() => runSync(false), delay || 4000);
 }
 
-function initAutoSync() {
-  const s = loadSyncStore();
+function initAutoSync() {  const s = loadSyncStore();
   if (!s.token || !s.pass) return;
   if (s.auto === false) return;
   scheduleAutoSync(1500);                 // 启动后先同步一次
@@ -1279,6 +1278,11 @@ function init() {
   switchTab('list');
   renderAll();
   initAutoSync();
+  // PWA：注册 Service Worker（https / localhost 下生效，本地 file:// 无需）
+  if ('serviceWorker' in navigator &&
+      (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
   if (!state.storageOk) toast('注意：当前浏览器无法保存数据');
 }
 

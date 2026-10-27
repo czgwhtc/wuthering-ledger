@@ -440,3 +440,108 @@ main { padding: 18px 16px 130px; }
   .ms-btn { background: rgba(255, 255, 255, .85); }
   .ms-now { background: rgba(255, 255, 255, .85); }
 }
+
+/* ---------- 账单导入（微信/支付宝 CSV） ---------- */
+.imp-summary { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+.imp-list { margin-top: 4px; max-height: 300px; overflow-y: auto; }
+.imp-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(20, 30, 60, .08); }
+.imp-row:last-child { border-bottom: none; }
+.imp-info { flex: 1; min-width: 0; }
+.imp-title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-sub { font-size: 11px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-amt { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+.imp-cat {
+  flex: none; height: 32px; border: 1px solid var(--border); border-radius: 8px;
+  background: rgba(255, 255, 255, .6); font-size: 12px; padding: 0 6px; color: var(--text);
+  outline: none; font-family: inherit;
+}
+.imp-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; align-items: center; }
+
+/* ---------- 年度账单 ---------- */
+.yb-banner { cursor: pointer; }
+.yb-banner-inner { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.yb-banner-title { font-size: 15px; font-weight: 800; }
+.yb-banner-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.yb-banner-go { flex: none; font-size: 13px; font-weight: 700; color: var(--primary); }
+.yb-banner:active { transform: scale(.99); }
+
+.yb-wrap { position: fixed; inset: 0; z-index: 40; pointer-events: none; opacity: 0; transition: opacity .25s ease; }
+.yb-wrap.open { pointer-events: auto; opacity: 1; }
+.yb-overlay {
+  position: absolute; inset: 0;
+  background: rgba(10, 13, 24, .8);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.yb-stage {
+  position: absolute; inset: 0;
+  max-width: 520px; margin: 0 auto; padding: 70px 26px 100px;
+  display: flex; flex-direction: column; justify-content: center; text-align: center;
+  color: #fff;
+}
+.yb-page { position: relative; animation: ybIn .35s ease; }
+@keyframes ybIn { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+/* 立绘是绝对定位，必须压到文字下面，否则会盖住标题 */
+.yb-page > *:not(.yb-art) { position: relative; z-index: 2; }
+.yb-kicker { font-size: 13px; letter-spacing: 4px; color: rgba(255, 255, 255, .8); margin-bottom: 14px; }
+.yb-year { font-size: 64px; font-weight: 800; line-height: 1.05; letter-spacing: 2px; text-shadow: 0 4px 24px rgba(0, 0, 0, .5); }
+.yb-big { font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 4px 24px rgba(0, 0, 0, .5); }
+.yb-big .yb-unit { font-size: 16px; font-weight: 400; margin-left: 6px; color: rgba(255, 255, 255, .75); }
+.yb-line { font-size: 15px; margin-top: 14px; line-height: 1.7; color: rgba(255, 255, 255, .92); }
+.yb-line b { font-size: 17px; }
+.yb-line.dim { color: rgba(255, 255, 255, .58); font-size: 13px; }
+.yb-quote { margin-top: 18px; font-size: 13px; color: rgba(255, 255, 255, .7); font-style: italic; }
+.yb-art {
+  position: absolute; right: -26px; bottom: -6px; height: 280px; object-fit: contain;
+  opacity: .8; z-index: 1; pointer-events: none;
+  filter: drop-shadow(-2px 4px 12px rgba(0, 0, 0, .45));
+  -webkit-mask-image: linear-gradient(200deg, #000 70%, transparent 97%);
+  mask-image: linear-gradient(200deg, #000 70%, transparent 97%);
+}
+.yb-art.left { right: auto; left: -26px; -webkit-mask-image: linear-gradient(160deg, #000 70%, transparent 97%); mask-image: linear-gradient(160deg, #000 70%, transparent 97%); }
+.yb-btn {
+  margin: 26px 6px 0; border: 1px solid rgba(255, 255, 255, .4); background: rgba(255, 255, 255, .16);
+  color: #fff; border-radius: 999px; padding: 10px 32px; font-size: 15px; cursor: pointer;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.yb-btn:active { background: rgba(255, 255, 255, .3); }
+.yb-close {
+  position: absolute; top: 18px; right: 18px; z-index: 2;
+  width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .3);
+  background: rgba(255, 255, 255, .14); color: #fff; font-size: 18px; cursor: pointer;
+}
+.yb-yearsel { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 2; }
+.yb-ychip {
+  border: 1px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .12);
+  color: rgba(255, 255, 255, .75); border-radius: 999px; font-size: 12px; padding: 4px 13px;
+  cursor: pointer; font-family: inherit;
+}
+.yb-ychip.on { background: #fff; color: #252a33; font-weight: 700; }
+.yb-nav {
+  position: absolute; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px; z-index: 2;
+}
+.yb-arrow {
+  width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .5);
+  background: rgba(255, 255, 255, .22); color: #fff; font-size: 20px; cursor: pointer;
+}
+.yb-arrow:disabled { opacity: .3; }
+.yb-dots { display: flex; gap: 7px; }
+.yb-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .55); }
+.yb-dot.on { background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, .8); }
+
+.yb-rank { margin-top: 8px; text-align: left; }
+.yb-rank-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+.yb-rank-no { font-size: 18px; font-weight: 800; font-style: italic; color: rgba(255, 255, 255, .5); width: 24px; flex: none; }
+.yb-rank-row img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex: none; }
+.yb-rank-main { flex: 1; min-width: 0; }
+.yb-rank-name { font-size: 14px; font-weight: 600; }
+.yb-rank-bar { height: 5px; background: rgba(255, 255, 255, .18); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+.yb-rank-fill { height: 100%; border-radius: 3px; }
+.yb-rank-val { flex: none; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.yb-rank-pct { display: block; font-size: 11px; color: rgba(255, 255, 255, .6); font-weight: 400; margin-top: 2px; }
+
+@media (max-width: 400px) {
+  .yb-art { height: 230px; }
+  .yb-year { font-size: 52px; }
+  .yb-big { font-size: 36px; }
+}

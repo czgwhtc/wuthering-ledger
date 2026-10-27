@@ -603,9 +603,90 @@ function renderAll() {
   renderMonthSwitchers();
   renderList();
   renderCharts();
+  renderSearch();
   renderMe();
   renderProfiles();
   updateSettingsUI();
+}
+
+/* ==================== 搜索页 ==================== */
+let searchHistory = [];
+try { searchHistory = JSON.parse(localStorage.getItem('ledger.search.history')) || []; } catch (e) { /* ignore */ }
+
+function saveSearchHistory() {
+  try { localStorage.setItem('ledger.search.history', JSON.stringify(searchHistory)); } catch (e) { /* ignore */ }
+}
+
+function commitSearchHistory(q) {
+  q = q.trim();
+  if (!q) return;
+  searchHistory = [q, ...searchHistory.filter(h => h !== q)].slice(0, 8);
+  saveSearchHistory();
+  renderSearchHistory();
+}
+
+function renderSearchHistory() {
+  const box = document.getElementById('search-history');
+  if (!box) return;
+  box.innerHTML = searchHistory.length ? `
+    <div class="search-hist-label">最近搜索</div>
+    <div class="search-hist">${searchHistory.map(h =>
+      `<button class="search-chip" data-q="${esc(h)}">${esc(h)}</button>`).join('')}
+      <button class="search-chip clear" id="btn-search-hist-clear">清空</button>
+    </div>` : '';
+}
+
+/* 匹配：备注 / 分类名 / 角色名 / 日期 / 金额（元） */
+function searchRecords(q) {
+  q = q.trim().toLowerCase();
+  if (!q) return [];
+  const num = parseFloat(q);
+  return state.data.records.filter(r => {
+    const c = catOf(r.type, r.category);
+    const amt = r.amountCents / 100;
+    return (r.note || '').toLowerCase().includes(q) ||
+      c.name.toLowerCase().includes(q) ||
+      c.chara.toLowerCase().includes(q) ||
+      r.date.includes(q) ||
+      (isFinite(num) && num > 0 && Math.abs(amt - num) < 0.005);
+  }).sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
+}
+
+function renderSearchResults() {
+  const box = document.getElementById('search-results');
+  if (!box) return;
+  const q = (document.getElementById('search-input').value || '').trim();
+  if (!q) {
+    box.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div><div>搜备注、分类、角色、金额、日期</div><div class="empty-hint">比如「美团」「餐饮」「爱弥斯」「25.5」「2026-10」</div></div>`;
+    return;
+  }
+  const rows = searchRecords(q);
+  if (!rows.length) {
+    box.innerHTML = `<div class="empty"><div class="empty-icon">🌫️</div><div>没找到与「${esc(q)}」相关的账单</div></div>`;
+    return;
+  }
+  const { income, expense } = sumsOf(rows);
+  const groups = [];
+  let cur = null;
+  for (const r of rows) {
+    if (!cur || cur.date !== r.date) {
+      cur = { date: r.date, records: [] };
+      groups.push(cur);
+    }
+    cur.records.push(r);
+  }
+  box.innerHTML = `
+    <div class="search-summary">共 <b>${rows.length}</b> 笔 · 支出 <b class="c-expense">${fmtYuan(expense, false)}</b> · 收入 <b class="c-income">${fmtYuan(income, false)}</b></div>
+    ${groups.map(g => `
+      <div class="day-group">
+        <div class="day-head"><span>${dayLabel(g.date)}</span><span>支出 ${fmtYuan(sumsOf(g.records).expense)}</span></div>
+        ${g.records.map(rowHTML).join('')}
+      </div>`).join('')}`;
+}
+
+function renderSearch() {
+  renderSearchHistory();
+  renderSearchResults();
 }
 
 function monthSwitcherHTML() {
@@ -1790,6 +1871,10 @@ function switchTab(tab) {
   document.querySelectorAll('.view')
     .forEach(v => v.classList.toggle('active', v.id === 'view-' + tab));
   closeSub();  // 切换主页面时收起子页
+  if (tab === 'search') {
+    renderSearch();
+    setTimeout(() => document.getElementById('search-input').focus(), 120);
+  }
 }
 
 /* 子页（账本/云同步/预算/数据管理/设置，都从「我的」进入，导航栏仍高亮「我的」） */
@@ -2012,6 +2097,46 @@ function init() {
     updateSettingsUI();
     renderAll();
     toast(`账期已设为每月 ${day} 号开始`);
+  });
+
+  // 搜索页
+  const sInput = document.getElementById('search-input');
+  let searchTimer = null;
+  sInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(renderSearchResults, 200);
+  });
+  sInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitSearchHistory(sInput.value);
+      renderSearchResults();
+    }
+  });
+  document.getElementById('btn-search').addEventListener('click', () => {
+    commitSearchHistory(sInput.value);
+    renderSearchResults();
+  });
+  document.getElementById('search-history').addEventListener('click', e => {
+    const clear = e.target.closest('#btn-search-hist-clear');
+    if (clear) {
+      searchHistory = [];
+      saveSearchHistory();
+      renderSearchHistory();
+      return;
+    }
+    const chip = e.target.closest('.search-chip');
+    if (chip) {
+      sInput.value = chip.dataset.q;
+      renderSearchResults();
+    }
+  });
+  // 点搜索结果 → 编辑该笔
+  document.getElementById('search-results').addEventListener('click', e => {
+    const row = e.target.closest('.record-row');
+    if (!row) return;
+    const rec = state.data.records.find(r => r.id === row.dataset.id);
+    if (rec) openSheet(rec);
   });
 
   // 账单导入（微信/支付宝 CSV）

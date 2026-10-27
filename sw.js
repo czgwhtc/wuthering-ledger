@@ -1,6 +1,6 @@
 /* 记账本 Service Worker：缓存全部静态资源，装成 App 后离线可用
    注意：改动静态文件后请把 CACHE 版本号 +1，用户端才会更新 */
-const CACHE = 'ledger-v23';
+const CACHE = 'ledger-v24';
 const CORE = [
   './',
   './index.html',

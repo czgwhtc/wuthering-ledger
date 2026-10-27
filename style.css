@@ -377,6 +377,15 @@ main { padding: 18px 16px 130px; }
   display: flex; align-items: stretch; gap: 12px;
 }
 .sheet-wrap.open .sheet { transform: translate(-50%, 0); }
+/* 声痕波纹背景：贴在弹层底部，向上渐隐，不挡交互 */
+.sheet-wave {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 190px;
+  pointer-events: none; z-index: 0; overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 34%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 34%);
+}
+.sheet-wave svg { width: 100%; height: 100%; display: block; }
+.sheet-form, .sheet-chara { position: relative; z-index: 1; }
 .sheet-form { flex: 1; min-width: 0; }
 .sheet-chara { flex: none; width: 150px; position: relative; }
 .sheet-chara img {

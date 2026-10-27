@@ -70,20 +70,20 @@ main { padding: 18px 16px 130px; }
 .back-btn:active { transform: scale(.94); }
 .page-title-row .page-title { margin: 0; }
 
-/* 「我的」里的设置入口 */
-.set-entry { cursor: pointer; }
-.set-entry:active { transform: scale(.99); }
-.set-entry-row { display: flex; align-items: center; gap: 12px; }
-.set-entry-icon {
+/* 「我的」里的子页入口（账本/云同步/预算/数据管理/设置） */
+.sub-entry { cursor: pointer; }
+.sub-entry:active { transform: scale(.99); }
+.sub-entry-row { display: flex; align-items: center; gap: 12px; }
+.sub-entry-icon {
   width: 40px; height: 40px; border-radius: 50%; flex: none;
   display: grid; place-items: center;
-  background: rgba(76, 110, 245, .14);
+  background: color-mix(in srgb, var(--c) 14%, #fff);
 }
-.set-entry-icon svg { width: 21px; height: 21px; fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.set-entry-main { flex: 1; min-width: 0; }
-.set-entry-title { font-size: 15px; font-weight: 700; }
-.set-entry-sub { font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.set-entry-go { flex: none; font-size: 20px; color: var(--muted); }
+.sub-entry-icon svg { width: 21px; height: 21px; fill: none; stroke: var(--c); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sub-entry-main { flex: 1; min-width: 0; }
+.sub-entry-title { font-size: 15px; font-weight: 700; }
+.sub-entry-sub { font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-entry-go { flex: none; font-size: 20px; color: var(--muted); }
 
 /* ---------- 月份切换 ---------- */
 .month-switcher { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }

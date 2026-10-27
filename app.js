@@ -375,7 +375,29 @@ function renderDay() {
     <button class="ms-btn" data-act="dnext" aria-label="后一天">›</button>`;
 
   const { income, expense } = sumsOf(records);
+
+  // 日预算：月预算均摊到当月每天
+  let dayBudgetHTML = '';
+  const budget = state.data.settings.monthlyBudget;
+  if (budget > 0) {
+    const days = new Date(+state.viewDate.slice(0, 4), +state.viewDate.slice(5, 7), 0).getDate();
+    const dayBudget = Math.round(budget / days);
+    const pct = Math.min(999, Math.round(expense / dayBudget * 100));
+    const cls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
+    const remain = dayBudget - expense;
+    const txt = remain >= 0
+      ? `日预算 ${fmtYuan(dayBudget)} · 已用 ${pct}% · 剩余 ${fmtYuan(remain)}`
+      : `日预算 ${fmtYuan(dayBudget)} · 已超支 ${fmtYuan(-remain)}`;
+    dayBudgetHTML = `
+      <div class="budget">
+        <div class="budget-text ${cls}">${txt}</div>
+        <div class="bbar"><div class="bfill ${cls}" style="width:${Math.min(100, pct)}%"></div></div>
+        <div class="budget-sub">按月预算 ${fmtYuan(budget)} ÷ ${days} 天均摊</div>
+      </div>`;
+  }
+
   document.getElementById('day-summary-card').innerHTML = `
+    ${dayBudgetHTML}
     <div class="summary-grid">
       <div class="sum-item"><span class="sum-label">支出</span><span class="sum-val c-expense">${fmtYuan(expense)}</span></div>
       <div class="sum-item"><span class="sum-label">收入</span><span class="sum-val c-income">${fmtYuan(income)}</span></div>

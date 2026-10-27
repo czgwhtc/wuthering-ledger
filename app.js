@@ -620,7 +620,7 @@ function saveSearchHistory() {
 function commitSearchHistory(q) {
   q = q.trim();
   if (!q) return;
-  searchHistory = [q, ...searchHistory.filter(h => h !== q)].slice(0, 8);
+  searchHistory = [q, ...searchHistory.filter(h => h !== q)].slice(0, 7);
   saveSearchHistory();
   renderSearchHistory();
 }
@@ -629,11 +629,23 @@ function renderSearchHistory() {
   const box = document.getElementById('search-history');
   if (!box) return;
   box.innerHTML = searchHistory.length ? `
-    <div class="search-hist-label">最近搜索</div>
-    <div class="search-hist">${searchHistory.map(h =>
-      `<button class="search-chip" data-q="${esc(h)}">${esc(h)}</button>`).join('')}
-      <button class="search-chip clear" id="btn-search-hist-clear">清空</button>
-    </div>` : '';
+    <div class="search-drop-title">最近搜索</div>
+    ${searchHistory.slice(0, 7).map(h =>
+      `<button class="search-drop-item" data-q="${esc(h)}">${esc(h)}</button>`).join('')}
+    <button class="search-drop-clear" id="btn-search-hist-clear">清空历史</button>` : '';
+}
+
+function showSearchDrop() {
+  const box = document.getElementById('search-history');
+  const input = document.getElementById('search-input');
+  if (!box || !input || !searchHistory.length || input.value.trim()) return;
+  renderSearchHistory();
+  box.classList.remove('hidden');
+}
+
+function hideSearchDrop() {
+  const box = document.getElementById('search-history');
+  if (box) box.classList.add('hidden');
 }
 
 /* 匹配：备注 / 分类名 / 角色名 / 日期 / 金额（元） */
@@ -655,11 +667,20 @@ function searchRecords(q) {
 function renderSearchResults() {
   const box = document.getElementById('search-results');
   if (!box) return;
+  const view = document.getElementById('view-search');
+  const card = document.getElementById('search-results-card');
+  const hint = document.getElementById('search-hint');
   const q = (document.getElementById('search-input').value || '').trim();
   if (!q) {
-    box.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div><div>搜备注、分类、角色、金额、日期</div><div class="empty-hint">比如「美团」「餐饮」「爱弥斯」「25.5」「2026-10」</div></div>`;
+    box.innerHTML = '';
+    card.classList.add('hidden');
+    if (hint) hint.classList.remove('hidden');
+    view.classList.remove('has-results');
     return;
   }
+  card.classList.remove('hidden');
+  if (hint) hint.classList.add('hidden');
+  view.classList.add('has-results');
   const rows = searchRecords(q);
   if (!rows.length) {
     box.innerHTML = `<div class="empty"><div class="empty-icon">🌫️</div><div>没找到与「${esc(q)}」相关的账单</div></div>`;
@@ -2099,35 +2120,38 @@ function init() {
     toast(`账期已设为每月 ${day} 号开始`);
   });
 
-  // 搜索页
+  // 搜索页：居中搜索框 + 下拉历史
   const sInput = document.getElementById('search-input');
+  const sDrop = document.getElementById('search-history');
   let searchTimer = null;
   sInput.addEventListener('input', () => {
+    hideSearchDrop();
     clearTimeout(searchTimer);
     searchTimer = setTimeout(renderSearchResults, 200);
   });
+  sInput.addEventListener('click', showSearchDrop);
+  sInput.addEventListener('blur', () => setTimeout(hideSearchDrop, 160));
   sInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
       commitSearchHistory(sInput.value);
+      hideSearchDrop();
       renderSearchResults();
     }
   });
-  document.getElementById('btn-search').addEventListener('click', () => {
-    commitSearchHistory(sInput.value);
-    renderSearchResults();
-  });
-  document.getElementById('search-history').addEventListener('click', e => {
-    const clear = e.target.closest('#btn-search-hist-clear');
-    if (clear) {
+  // 防止点历史项时 blur 抢先关掉下拉
+  sDrop.addEventListener('mousedown', e => e.preventDefault());
+  sDrop.addEventListener('click', e => {
+    if (e.target.closest('#btn-search-hist-clear')) {
       searchHistory = [];
       saveSearchHistory();
-      renderSearchHistory();
+      hideSearchDrop();
       return;
     }
-    const chip = e.target.closest('.search-chip');
-    if (chip) {
-      sInput.value = chip.dataset.q;
+    const item = e.target.closest('.search-drop-item');
+    if (item) {
+      sInput.value = item.dataset.q;
+      hideSearchDrop();
       renderSearchResults();
     }
   });

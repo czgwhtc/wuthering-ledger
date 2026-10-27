@@ -25,7 +25,7 @@ const CATEGORIES = {
   ],
 };
 
-/* 记一笔弹层的角色立绘池（全部五星限定角色，陆赫斯/锁暝 BWIKI 暂无立绘故未收录），每次打开随机展示一张 */
+/* 记一笔弹层的角色立绘池（39 位五星限定全员），每次打开随机展示一张 */
 const CHARA_ARTS = [
   { file: 'assets/chara/art-1.png', name: '守岸人' },
   { file: 'assets/chara/art-2.png', name: '长离' },
@@ -64,6 +64,8 @@ const CHARA_ARTS = [
   { file: 'assets/chara/art-35.png', name: '清宵' },
   { file: 'assets/chara/art-36.png', name: '景燃' },
   { file: 'assets/chara/art-37.png', name: '秧秧·玄翎' },
+  { file: 'assets/chara/art-38.png', name: '陆赫斯' },
+  { file: 'assets/chara/art-39.png', name: '锁暝' },
 ];
 
 function catOf(type, key) {

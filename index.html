@@ -46,16 +46,15 @@
 
     <!-- 搜索 -->
     <section class="view" id="view-search">
-      <div class="page-title">搜索</div>
-      <div class="card">
-        <div class="search-bar">
+      <div class="search-hero" id="search-hero">
+        <div class="search-box">
           <svg class="search-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-          <input id="search-input" type="search" placeholder="搜备注、分类、角色、金额、日期" autocomplete="off">
-          <button id="btn-search" class="btn-mini">搜一下</button>
+          <input id="search-input" type="search" placeholder="搜索账单：备注 / 分类 / 角色 / 金额 / 日期" autocomplete="off">
         </div>
-        <div id="search-history"></div>
+        <div class="search-drop hidden" id="search-history"></div>
+        <div class="search-hint" id="search-hint">试试搜「美团」「餐饮」「爱弥斯」「25.5」「2026-10」</div>
       </div>
-      <div class="card"><div id="search-results"></div></div>
+      <div class="card hidden" id="search-results-card"><div id="search-results"></div></div>
     </section>
 
     <!-- 账本子页 -->

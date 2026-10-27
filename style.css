@@ -209,6 +209,35 @@ main { padding: 18px 16px 130px; }
 .sel-check.on { background: var(--expense); border-color: var(--expense); }
 .record-row.selectable:active { background: rgba(20, 30, 60, .03); }
 
+/* ---------- 设置页 ---------- */
+.set-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 6px 0 12px; border-bottom: 1px solid rgba(20, 30, 60, .08);
+}
+.set-name { font-size: 14px; font-weight: 600; }
+.set-desc { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+.switch {
+  flex: none; width: 46px; height: 27px; border-radius: 999px;
+  background: rgba(20, 30, 60, .25); border: 1px solid rgba(255, 255, 255, .35);
+  position: relative; cursor: pointer; transition: background .2s;
+}
+.switch::after {
+  content: ''; position: absolute; top: 2.5px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  transition: left .2s; box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+}
+.switch.on { background: var(--income); }
+.switch.on::after { left: 22px; }
+.rec-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 2px;
+  border-bottom: 1px solid rgba(20, 30, 60, .08); font-size: 14px;
+}
+.rec-row:last-child { border-bottom: none; }
+.rec-row .rec-info { flex: 1; min-width: 0; }
+.rec-row .rec-title-line { font-weight: 600; display: flex; align-items: center; gap: 5px; }
+.rec-row .rec-sub-line { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.rec-flag { font-size: 12px; }
+
 /* ---------- 云同步 ---------- */
 .sync-provider-row { margin-bottom: 8px; }
 .sync-label { font-size: 13px; color: var(--muted); flex: none; }
@@ -221,6 +250,12 @@ main { padding: 18px 16px 130px; }
 .sync-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 #sync-body .profile-form { margin-top: 2px; }
 #sync-body .profile-form input { min-width: 0; }
+.rec-form { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.rec-form input, .rec-form select {
+  min-width: 0; height: 38px; border: 1px solid var(--border); border-radius: 10px;
+  padding: 0 8px; font-size: 13px; outline: none; background: rgba(255, 255, 255, .5); color: var(--text); flex: 1;
+}
+.rec-form input:focus, .rec-form select:focus { border-color: var(--primary); }
 
 /* ---------- 预算 ---------- */
 .budget-form { display: flex; align-items: center; gap: 8px; }
@@ -268,7 +303,7 @@ main { padding: 18px 16px 130px; }
 .tabbar {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 520px;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(5, 1fr);
   background: rgba(255, 255, 255, .68);
   backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);

@@ -800,21 +800,38 @@ function b64(u8) { return btoa(String.fromCharCode(...u8)); }
 function ub64(s) { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
 
 async function ghGist(method, path, token, body) {
-  const r = await fetch('https://api.github.com' + path, {
-    method,
-    headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github+json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const s = loadSyncStore();
+  const provider = s.provider || 'github';
+  let url, init;
+  if (provider === 'gitee') {
+    const sep = path.includes('?') ? '&' : '?';
+    url = 'https://gitee.com/api/v5' + path + sep + 'access_token=' + encodeURIComponent(token);
+    if (method === 'GET') {
+      init = { method };
+    } else {
+      init = { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) };
+    }
+  } else {
+    url = 'https://api.github.com' + path;
+    init = { method, headers: { Authorization: 'token ' + token, Accept: 'application/vnd.github+json' } };
+    if (body) init.body = JSON.stringify(body);
+  }
+  const r = await fetch(url, init);
   if (!r.ok) {
     let msg = 'HTTP ' + r.status;
     try { const d = await r.json(); msg = d.message || msg; } catch (e) { /* ignore */ }
     if (r.status === 401) msg = '令牌无效或已过期';
-    else if (r.status === 403) msg = '令牌权限不足（需要 gist 权限，请用软件里的链接重新生成）';
+    else if (r.status === 403) msg = '令牌权限不足（' + (provider === 'gitee' ? 'Gitee 令牌需勾选 gists 权限' : '需要 gist 权限，请用软件里的链接重新生成') + '）';
     else if (r.status === 404 && method === 'GET') msg = '云端还没有同步数据（先在一台设备上上传）';
-    else if (r.status === 404) msg = 'GitHub 拒绝了写入（令牌很可能没有 gist 权限，请用软件里的链接重新生成令牌）';
+    else if (r.status === 404) msg = '云端拒绝写入（令牌可能没有 gist/代码片段权限，请重新生成）';
     throw new Error(msg);
   }
   return r.json();
+}
+
+function gistFileContent(gist, name) {
+  const f = (gist.files || {})[name];
+  return f ? (f.content != null ? f.content : f.text) : null;
 }
 
 async function deriveKey(pass, salt) {
@@ -977,8 +994,10 @@ function initAutoSync() {
 async function fetchCloudPayload() {
   const s = loadSyncStore();
   const gist = await findSyncGist(s.token);
-  if (!gist || !gist.files['ledger.enc']) throw new Error('云端还没有同步数据（先在一台设备上上传）');
-  const env = JSON.parse(gist.files['ledger.enc'].content);
+  if (!gist) throw new Error('云端还没有同步数据（先在一台设备上上传）');
+  const content = gistFileContent(gist, 'ledger.enc');
+  if (content == null) throw new Error('云端还没有同步数据（先在一台设备上上传）');
+  const env = JSON.parse(content);
   let payload;
   try {
     payload = JSON.parse(await decryptForSync(s.pass, env));
@@ -993,25 +1012,35 @@ function renderSyncCard() {
   const box = document.getElementById('sync-body');
   if (!box) return;
   const s = loadSyncStore();
+  const provider = s.provider || 'github';
   const configured = !!(s.token && s.pass);
   const autoOn = s.auto !== false;
   const fmtT = t => t ? new Date(t).toLocaleString('zh-CN', { hour12: false }) : '从未';
+  const tokenLink = provider === 'gitee'
+    ? '<a href="https://gitee.com/profile/personal_access_tokens" target="_blank" rel="noopener">去 Gitee 生成令牌（只勾选 gists/代码片段 权限）</a>'
+    : '<a href="https://github.com/settings/tokens/new?scopes=gist&description=ledger-sync" target="_blank" rel="noopener">点这里（已预选 gist 权限）</a>';
   box.innerHTML = `
+    <div class="profile-form sync-provider-row">
+      <label class="sync-label">同步到</label>
+      <select id="sync-provider" class="sync-select">
+        <option value="github" ${provider === 'github' ? 'selected' : ''}>GitHub</option>
+        <option value="gitee" ${provider === 'gitee' ? 'selected' : ''}>Gitee（国内直连，推荐）</option>
+      </select>
+    </div>
     <div class="profile-form">
-      <input id="sync-token" type="password" placeholder="GitHub 令牌（只需 gist 权限）" value="${esc(s.token || '')}" autocomplete="off">
+      <input id="sync-token" type="password" placeholder="${provider === 'gitee' ? 'Gitee 私人令牌（勾选 gists 权限）' : 'GitHub 令牌（只需 gist 权限）'}" value="${esc(s.token || '')}" autocomplete="off">
       <input id="sync-pass" type="password" placeholder="同步密码（两端一致）" value="${esc(s.pass || '')}" autocomplete="off">
       <button id="btn-sync-save" class="btn-mini">保存</button>
     </div>
     ${configured ? `
-    <div class="sync-status">${autoOn ? '🔄 自动同步已开启' : '⏸ 自动同步已暂停'} · 上次同步 ${fmtT(s.lastSync)}${syncLastError ? ' · <b style="color:var(--expense)">失败：' + esc(syncLastError) + '</b>' : ''}</div>
+    <div class="sync-status">${provider === 'gitee' ? 'Gitee' : 'GitHub'} · ${autoOn ? '🔄 自动同步已开启' : '⏸ 自动同步已暂停'} · 上次同步 ${fmtT(s.lastSync)}${syncLastError ? ' · <b style="color:var(--expense)">失败：' + esc(syncLastError) + '</b>' : ''}</div>
     <div class="sync-actions">
       <button class="manage-btn" id="btn-sync-now">立即同步</button>
       <button class="manage-btn" id="btn-sync-auto">${autoOn ? '暂停自动' : '开启自动'}</button>
       <button class="manage-btn" id="btn-sync-reset">断开</button>
     </div>` : `
-    <div class="sync-status">填好令牌和密码并保存后自动开始同步。令牌生成：
-      <a href="https://github.com/settings/tokens/new?scopes=gist&description=ledger-sync" target="_blank" rel="noopener">点这里（已预选 gist 权限）</a></div>`}
-    <div class="card-hint">多设备同时记账会自动合并：新增合并、编辑取较新、删除保留。数据加密后存你的私密 Gist，令牌密码只存本机。</div>`;
+    <div class="sync-status">填好令牌和密码并保存后自动开始同步。令牌生成：${tokenLink}</div>`}
+    <div class="card-hint">多设备同时记账会自动合并：新增合并、编辑取较新、删除保留。数据加密后存你的私密 Gist，令牌密码只存本机。两台设备要选同一个服务商。</div>`;
 }
 
 /* ==================== 背景音乐 ==================== */
@@ -1220,6 +1249,9 @@ function init() {
     if (!btn) return;
     if (btn.id === 'btn-sync-save') {
       const s = loadSyncStore();
+      const newProvider = document.getElementById('sync-provider').value;
+      if ((s.provider || 'github') !== newProvider) s.gistId = null;  // 换服务商后重新发现
+      s.provider = newProvider;
       s.token = document.getElementById('sync-token').value.trim();
       s.pass = document.getElementById('sync-pass').value;
       if (!s.token || !s.pass) { toast('令牌和密码都要填'); return; }

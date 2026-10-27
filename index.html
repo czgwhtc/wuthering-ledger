@@ -19,9 +19,17 @@
 <div id="bg-scrim"></div>
 <div class="app">
   <main>
+    <!-- 今日（每日明细） -->
+    <section class="view active" id="view-day">
+      <div class="page-title">今日账单</div>
+      <div class="month-switcher day-switcher" id="day-switcher"></div>
+      <div class="card" id="day-summary-card"></div>
+      <div class="card"><div id="day-record-list"></div></div>
+    </section>
+
     <!-- 明细 -->
-    <section class="view active" id="view-list">
-      <div class="page-title">明细</div>
+    <section class="view" id="view-list">
+      <div class="page-title">月度明细</div>
       <div class="month-switcher" id="ms-list"></div>
       <div class="card" id="summary-card"></div>
       <div class="card" id="list-card"><div id="record-list"></div></div>
@@ -74,7 +82,8 @@
       <div class="card">
         <div class="card-title">关于</div>
         <div class="card-hint">
-          记账本 v2.0 · 鸣潮主题记账<br>
+          记账本 v3.0 · 鸣潮主题记账<br>
+          · 每日明细：进入即看当天账单，可翻任意日期<br>
           · 39 位五星限定角色官方海报轮换，每 10 秒换一张<br>
           · 分类头像与角色立绘来自鸣潮 BWIKI / 官网（版权归库洛游戏所有）<br>
           · 背景音乐《繁星，新生，与你 Astrum Unicum》<br>
@@ -94,7 +103,10 @@
   <button class="fab" id="fab-add" aria-label="记一笔">＋</button>
 
   <nav class="tabbar">
-    <button class="tab-btn active" data-tab="list">
+    <button class="tab-btn active" data-tab="day">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9.5h18M8 14h3m4 0h1M8 17.5h3m4 0h1"/></svg><span>今日</span>
+    </button>
+    <button class="tab-btn" data-tab="list">
       <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>明细</span>
     </button>
     <button class="tab-btn" data-tab="charts">

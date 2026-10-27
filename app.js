@@ -25,7 +25,7 @@ const CATEGORIES = {
   ],
 };
 
-/* 记一笔弹层的角色立绘池，每次打开随机展示一张 */
+/* 记一笔弹层的角色立绘池（全部五星限定角色，陆赫斯/锁暝 BWIKI 暂无立绘故未收录），每次打开随机展示一张 */
 const CHARA_ARTS = [
   { file: 'assets/chara/art-1.png', name: '守岸人' },
   { file: 'assets/chara/art-2.png', name: '长离' },
@@ -37,6 +37,33 @@ const CHARA_ARTS = [
   { file: 'assets/chara/art-8.png', name: '心' },
   { file: 'assets/chara/art-9.png', name: '尤诺' },
   { file: 'assets/chara/art-10.png', name: '弗洛洛' },
+  { file: 'assets/chara/art-11.png', name: '忌炎' },
+  { file: 'assets/chara/art-12.png', name: '吟霖' },
+  { file: 'assets/chara/art-13.png', name: '折枝' },
+  { file: 'assets/chara/art-14.png', name: '相里要' },
+  { file: 'assets/chara/art-15.png', name: '洛可可' },
+  { file: 'assets/chara/art-16.png', name: '菲比' },
+  { file: 'assets/chara/art-17.png', name: '布兰特' },
+  { file: 'assets/chara/art-18.png', name: '赞妮' },
+  { file: 'assets/chara/art-19.png', name: '夏空' },
+  { file: 'assets/chara/art-20.png', name: '卡提希娅' },
+  { file: 'assets/chara/art-21.png', name: '露帕' },
+  { file: 'assets/chara/art-22.png', name: '奥古斯塔' },
+  { file: 'assets/chara/art-23.png', name: '嘉贝莉娜' },
+  { file: 'assets/chara/art-24.png', name: '仇远' },
+  { file: 'assets/chara/art-25.png', name: '千咲' },
+  { file: 'assets/chara/art-26.png', name: '琳奈' },
+  { file: 'assets/chara/art-27.png', name: '莫宁' },
+  { file: 'assets/chara/art-28.png', name: '西格莉卡' },
+  { file: 'assets/chara/art-29.png', name: '绯雪' },
+  { file: 'assets/chara/art-30.png', name: '达妮娅' },
+  { file: 'assets/chara/art-31.png', name: '丽贝卡' },
+  { file: 'assets/chara/art-32.png', name: '露西' },
+  { file: 'assets/chara/art-33.png', name: '洛瑟菈' },
+  { file: 'assets/chara/art-34.png', name: '穗穗' },
+  { file: 'assets/chara/art-35.png', name: '清宵' },
+  { file: 'assets/chara/art-36.png', name: '景燃' },
+  { file: 'assets/chara/art-37.png', name: '秧秧·玄翎' },
 ];
 
 function catOf(type, key) {

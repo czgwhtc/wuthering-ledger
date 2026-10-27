@@ -58,6 +58,33 @@ main { padding: 18px 16px 130px; }
 .view.active { display: block; animation: fade .18s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(4px);} to { opacity: 1; transform: none;} }
 
+/* 设置子页（从「我的」进入） */
+.subview { display: none; }
+.subview.active { display: block; animation: fade .18s ease; }
+.page-title-row { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; }
+.back-btn {
+  width: 34px; height: 34px; border: 1px solid rgba(255, 255, 255, .28); border-radius: 10px;
+  background: rgba(255, 255, 255, .18); color: #fff; font-size: 20px; line-height: 1;
+  cursor: pointer; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.back-btn:active { transform: scale(.94); }
+.page-title-row .page-title { margin: 0; }
+
+/* 「我的」里的设置入口 */
+.set-entry { cursor: pointer; }
+.set-entry:active { transform: scale(.99); }
+.set-entry-row { display: flex; align-items: center; gap: 12px; }
+.set-entry-icon {
+  width: 40px; height: 40px; border-radius: 50%; flex: none;
+  display: grid; place-items: center;
+  background: rgba(76, 110, 245, .14);
+}
+.set-entry-icon svg { width: 21px; height: 21px; fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.set-entry-main { flex: 1; min-width: 0; }
+.set-entry-title { font-size: 15px; font-weight: 700; }
+.set-entry-sub { font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-entry-go { flex: none; font-size: 20px; color: var(--muted); }
+
 /* ---------- 月份切换 ---------- */
 .month-switcher { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .ms-btn {
@@ -303,7 +330,7 @@ main { padding: 18px 16px 130px; }
 .tabbar {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 520px;
-  display: grid; grid-template-columns: repeat(5, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   background: rgba(255, 255, 255, .68);
   backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);

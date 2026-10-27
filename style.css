@@ -385,6 +385,7 @@ main { padding: 18px 16px 130px; }
   object-fit: contain; object-position: bottom center;
   filter: drop-shadow(-2px 4px 10px rgba(20, 24, 40, .22));
   animation: charaIn .4s ease;
+  cursor: pointer;
 }
 @keyframes charaIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 .chara-tag {

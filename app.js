@@ -397,12 +397,11 @@ function renderDay() {
   }
 
   document.getElementById('day-summary-card').innerHTML = `
-    ${dayBudgetHTML}
     <div class="summary-grid">
       <div class="sum-item"><span class="sum-label">支出</span><span class="sum-val c-expense">${fmtYuan(expense)}</span></div>
       <div class="sum-item"><span class="sum-label">收入</span><span class="sum-val c-income">${fmtYuan(income)}</span></div>
       <div class="sum-item"><span class="sum-label">结余</span><span class="sum-val ${income - expense >= 0 ? '' : 'c-expense'}">${fmtYuan(income - expense)}</span></div>
-    </div>
+    </div>${dayBudgetHTML}
     <div class="day-count">${records.length ? `共 ${records.length} 笔` : ''}</div>`;
 
   const box = document.getElementById('day-record-list');

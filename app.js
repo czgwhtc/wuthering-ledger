@@ -342,6 +342,7 @@ function normalizeData(obj) {
       createdAt: +r.createdAt || Date.now(),
       updatedAt: +r.updatedAt || +r.createdAt || Date.now(),
       recurringId: r.recurringId ? String(r.recurringId) : undefined,
+      extId: r.extId ? String(r.extId).slice(0, 64) : undefined,  // 微信/支付宝交易单号，用于导入去重
     }));
   }
   if (obj && obj.settings && isFinite(+obj.settings.monthlyBudget)) {
@@ -784,6 +785,7 @@ function rowHTML(r) {
 }
 
 function renderCharts() {
+  renderYbBanner();
   const records = recordsOfMonth(state.viewMonth);
   const expense = sumsOf(records).expense;
   const donutTitle = periodBarLabel(state.viewMonth);
@@ -888,6 +890,379 @@ function renderMe() {
     ? `账本「${state.profileName}」· 共 ${dates.length} 笔 · ${dates[0]} ~ ${dates[dates.length - 1]}`
     : `账本「${state.profileName}」· 还没有任何账单`;
   document.getElementById('storage-warn').classList.toggle('hidden', state.storageOk);
+}
+
+/* ==================== 账单导入（微信 / 支付宝 CSV） ==================== */
+/* 关键词 → 分类规则，按顺序匹配，先命中先得（交通/居住等具体词放前面，餐饮这类泛词放最后） */
+const BILL_RULES = [
+  { cat: 'transport', words: ['美团单车', '哈啰', '哈罗单车', '青桔', '共享单车', '滴滴', '高德', '出租车', '网约车', '花小猪', 't3出行', '曹操出行', '地铁', '公交', '一卡通', '交通卡', '12306', '铁路', '航空', '机票', '南方航空', '东方航空', '国航', '携程', '去哪儿', '同程', '加油', '中国石化', '中国石油', '壳牌', '停车'] },
+  { cat: 'housing', words: ['房租', '租房', '物业', '水费', '电费', '燃气', '水电', '宽带', '供暖', '热力', '中国移动', '中国联通', '中国电信', '话费', '充电桩', '自如', '贝壳'] },
+  { cat: 'fun', words: ['腾讯视频', '爱奇艺', '优酷', '芒果tv', '哔哩哔哩', 'bilibili', 'b站', '大会员', 'steam', '游戏', '米哈游', '库洛', '鸣潮', '原神', '崩坏', '网易', '猫眼', '淘票票', '电影', '影院', 'ktv', '网吧', '网咖', '密室', '剧本杀', '网易云', 'qq音乐', '酷狗', '抖音', '快手', '喜马拉雅'] },
+  { cat: 'study', words: ['当当', '书店', '孔夫子', '新华书店', '学校', '大学', '学费', '住宿费', '考试', '报名费', '网课', '慕课', 'mooc', '得到', '知乎', '樊登', '培训', '文具', '打印', '复印', '知网', '百度文库', 'wps会员', '中国教育考试网'] },
+  { cat: 'medical', words: ['医院', '药房', '药店', '诊所', '医药', '药品', '挂号', '体检', '牙科', '口腔', '眼镜', '爱尔', '京东健康', '阿里健康', '口罩'] },
+  { cat: 'shopping', words: ['淘宝', '天猫', '京东', '拼多多', '唯品会', '苏宁', '得物', '闲鱼', '小米', '华为商城', '苹果', 'apple', 'app store', '超市', '沃尔玛', '永辉', '盒马', '大润发', '华润万家', '便利店', '名创优品', '优衣库', 'zara', '无印良品', '百货', '商城', '旗舰店', '快递', '顺丰', '圆通', '中通', '韵达', '邮政'] },
+  { cat: 'food', words: ['美团', '饿了么', '外卖', '肯德基', '麦当劳', '必胜客', '星巴克', '瑞幸', '库迪', '蜜雪冰城', '喜茶', '古茗', '茶百道', '沪上阿姨', '书亦', '益禾堂', '海底捞', '呷哺', '火锅', '烤肉', '烧烤', '串串', '餐厅', '饭店', '餐馆', '餐饮', '食堂', '咖啡', '奶茶', '饮品', '汉堡', '披萨', '沙县', '兰州', '拉面', '米线', '面条', '快餐', '小吃', '夜宵', '美食', '大众点评'] },
+  { cat: 'salary', type: 'income', words: ['工资', '薪资', '薪水', '代发'] },
+  { cat: 'bonus', type: 'income', words: ['奖金', '年终奖', '绩效奖'] },
+  { cat: 'invest', type: 'income', words: ['余额宝', '零钱通', '理财', '基金', '利息', '收益', '黄金', '股票', '分红'] },
+  { cat: 'sidejob', type: 'income', words: ['兼职', '稿费', '稿酬', '劳务', '实习补贴'] },
+];
+
+function guessBillCategory(rec) {
+  const text = `${rec.counterparty} ${rec.goods} ${rec.rawType}`.toLowerCase();
+  for (const rule of BILL_RULES) {
+    if (rule.type && rule.type !== rec.type) continue;
+    if (rule.words.some(w => text.includes(w))) return rule.cat;
+  }
+  return 'other';
+}
+
+/* 带引号的 CSV 行解析（备注里可能有逗号） */
+function parseCSVLine(line) {
+  const out = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = false;
+      } else cur += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ',') { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+}
+
+/* 微信导出的 CSV 可能是 UTF-8 也可能是 GBK：先用 UTF-8 解，表头特征不对再换 GBK。
+   特征检测直接内联（不依赖外部函数），避免任何加载时序差异 */
+function decodeBillText(buf) {
+  const stripBOM = s => (s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s);
+  const looksLikeBill = s => {
+    if (!s) return false;
+    for (const line of s.split('\n').slice(0, 40)) {
+      if (line.includes('交易时间') || line.includes('付款时间') || line.includes('交易创建时间')) return true;
+    }
+    return false;
+  };
+  let text = stripBOM(new TextDecoder('utf-8').decode(buf));
+  if (!looksLikeBill(text)) {
+    try { text = stripBOM(new TextDecoder('gbk').decode(buf)); } catch (e) { /* 浏览器不支持就按 UTF-8 走 */ }
+  }
+  return text;
+}
+
+function findBillHeaderLine(text) {
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < Math.min(lines.length, 40); i++) {
+    const cells = parseCSVLine(lines[i]);
+    const hasTime = cells.some(c => ['交易时间', '付款时间', '交易创建时间'].includes(c));
+    const hasDir = cells.some(c => c === '收/支');
+    const hasAmt = cells.some(c => ['金额(元)', '金额（元）', '金额'].includes(c));
+    if (hasTime && hasDir && hasAmt) return i;
+  }
+  return -1;
+}
+
+function parseBillCSV(text) {
+  const lines = text.split(/\r?\n/);
+  const headIdx = findBillHeaderLine(text);
+  if (headIdx < 0) return { error: '没认出这是微信/支付宝账单，请选择解压后的 CSV 文件' };
+  let cols = parseCSVLine(lines[headIdx]);
+  // 微信导出的表头行以 "---------" 分隔线单元格开头，而数据行没有这一列，去掉才对得齐
+  if (/^-+$/.test(cols[0] || '')) cols = cols.slice(1);
+  const pick = (...names) => { for (const n of names) { const i = cols.indexOf(n); if (i >= 0) return i; } return -1; };
+  const iTime = pick('交易时间', '付款时间', '交易创建时间');
+  const iType = pick('交易类型', '类型');
+  const iWho = pick('交易对方');
+  const iGoods = pick('商品', '商品名称');
+  const iDir = pick('收/支');
+  const iAmt = pick('金额(元)', '金额（元）', '金额');
+  const iStatus = pick('当前状态', '交易状态');
+  const iTid = pick('交易单号', '支付宝交易号', '交易号', '微信支付单号');
+  const iNote = pick('备注');
+
+  const rows = [];
+  const skipped = { neutral: 0, refunded: 0, bad: 0 };
+  for (let i = headIdx + 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const cells = parseCSVLine(lines[i]);
+    const dir = (cells[iDir] || '').trim();
+    const cents = Math.round(parseFloat((cells[iAmt] || '').replace(/[^\d.]/g, '')) * 100);
+    const date = (cells[iTime] || '').slice(0, 10);
+    if (!dir || !cents || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      if (cells.some(c => c)) skipped.bad++;  // 尾部汇总行等
+      continue;
+    }
+    const status = (iStatus >= 0 ? cells[iStatus] : '') || '';
+    if (/退款|失败|关闭|处理中/.test(status)) { skipped.refunded++; continue; }
+    let type = null;
+    if (dir === '支出') type = 'expense';
+    else if (dir === '收入') type = 'income';
+    else { skipped.neutral++; continue; }   // "/" 或 不计收支：转账、零钱通等
+    rows.push({
+      type, amountCents: cents, date,
+      counterparty: (iWho >= 0 ? cells[iWho] : '').replace(/^\/$/, '').trim(),
+      goods: (iGoods >= 0 ? cells[iGoods] : '').replace(/^\/$/, '').trim(),
+      rawType: (iType >= 0 ? cells[iType] : '').trim(),
+      tid: (iTid >= 0 ? cells[iTid] : '').trim(),
+      note: (iNote >= 0 ? cells[iNote] : '').replace(/^\/$/, '').trim(),
+    });
+  }
+  return { rows, skipped };
+}
+
+let billImport = null;  // { items: [{key, rec, dup, cat}], skipped }
+
+function onBillFile(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const res = parseBillCSV(decodeBillText(reader.result));
+      if (res.error) { toast(res.error); return; }
+      if (!res.rows.length) { toast('没有可导入的记录（转账/退款类流水已自动跳过）'); return; }
+      const existIds = new Set(state.data.records.map(r => r.extId).filter(Boolean));
+      const seen = new Set();
+      billImport = {
+        items: res.rows.map((rec, i) => {
+          const dup = rec.tid && (existIds.has(rec.tid) || seen.has(rec.tid));
+          if (rec.tid) seen.add(rec.tid);
+          return { key: rec.tid || 'w' + i, rec, dup, cat: guessBillCategory(rec) };
+        }),
+        skipped: res.skipped,
+      };
+      renderBillPreview();
+    } catch (err) {
+      toast('解析失败：' + (err.message || '文件格式不正确'));
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderBillPreview() {
+  const box = document.getElementById('bill-preview');
+  if (!billImport) { box.innerHTML = ''; return; }
+  const fresh = billImport.items.filter(it => !it.dup);
+  const dups = billImport.items.length - fresh.length;
+  const { neutral, refunded } = billImport.skipped;
+  if (!fresh.length) {
+    box.innerHTML = `<div class="imp-summary">这批账单以前都导入过了，<b>${dups}</b> 笔重复自动跳过</div>`;
+    return;
+  }
+  const skipTxt = (dups ? `重复 ${dups} 笔跳过` : '') +
+    (neutral + refunded ? `${dups ? '，' : ''}转账/退款等 ${neutral + refunded} 笔不计` : '');
+  box.innerHTML = `
+    <div class="imp-summary">解析出 <b>${fresh.length}</b> 笔${skipTxt ? '（' + skipTxt + '）' : ''}，分类可逐笔调整</div>
+    <div class="imp-list">${fresh.map(it => {
+      const rec = it.rec;
+      const cats = CATEGORIES[rec.type];
+      if (!cats.some(c => c.key === it.cat)) it.cat = cats[cats.length - 1].key;
+      return `
+      <div class="imp-row">
+        <div class="imp-info">
+          <div class="imp-title">${esc(rec.goods || rec.counterparty || rec.rawType || '账单')}</div>
+          <div class="imp-sub">${rec.date}${rec.counterparty && rec.goods ? ' · ' + esc(rec.counterparty) : ''}</div>
+        </div>
+        <span class="imp-amt ${rec.type === 'income' ? 'c-income' : 'c-expense'}">${rec.type === 'income' ? '+' : '-'}${fmtYuan(rec.amountCents, false)}</span>
+        <select class="imp-cat" data-k="${esc(it.key)}">${cats.map(c =>
+          `<option value="${c.key}" ${c.key === it.cat ? 'selected' : ''}>${c.name}</option>`).join('')}</select>
+      </div>`;
+    }).join('')}</div>
+    <div class="imp-actions">
+      <button class="manage-btn" id="btn-bill-cancel">取消</button>
+      <button class="btn-mini" id="btn-bill-go">导入 ${fresh.length} 笔</button>
+    </div>`;
+}
+
+function doBillImport() {
+  if (!billImport) return;
+  const items = billImport.items.filter(it => !it.dup);
+  let n = 0;
+  for (const it of items) {
+    const rec = it.rec;
+    state.data.records.push({
+      id: uid(), type: rec.type, amountCents: rec.amountCents, category: it.cat,
+      date: rec.date, note: (rec.goods || rec.counterparty || rec.rawType || '').slice(0, 50),
+      createdAt: Date.now(), updatedAt: Date.now(),
+      extId: rec.tid || undefined,
+    });
+    n++;
+  }
+  saveData();
+  billImport = null;
+  renderBillPreview();
+  renderAll();
+  toast(`已导入 ${n} 笔账单`);
+}
+
+/* ==================== 年度账单 ==================== */
+const yb = { year: null, page: 0, stats: null, pages: 7 };
+
+function yearsWithData() {
+  const ys = new Set(state.data.records.map(r => r.date.slice(0, 4)));
+  return [...ys].sort().reverse();
+}
+
+function yearStats(year) {
+  const recs = state.data.records.filter(r => r.date.startsWith(year));
+  const s = {
+    year, count: recs.length, expense: 0, income: 0,
+    days: new Set(recs.map(r => r.date)).size,
+    byCat: {}, catCount: {}, maxExpense: null, monthExp: Array(12).fill(0),
+  };
+  for (const r of recs) {
+    if (r.type === 'income') { s.income += r.amountCents; continue; }
+    s.expense += r.amountCents;
+    s.byCat[r.category] = (s.byCat[r.category] || 0) + r.amountCents;
+    s.catCount[r.category] = (s.catCount[r.category] || 0) + 1;
+    s.monthExp[+r.date.slice(5, 7) - 1] += r.amountCents;
+    if (!s.maxExpense || r.amountCents > s.maxExpense.amountCents) s.maxExpense = r;
+  }
+  s.topCats = Object.entries(s.byCat)
+    .map(([key, cents]) => ({ ...catOf('expense', key), cents, n: s.catCount[key] }))
+    .sort((a, b) => b.cents - a.cents).slice(0, 3);
+  let mi = 0;
+  s.monthExp.forEach((v, i) => { if (v > s.monthExp[mi]) mi = i; });
+  s.maxMonth = s.monthExp[mi] > 0 ? { m: mi + 1, cents: s.monthExp[mi] } : null;
+  const ds = [...new Set(recs.map(r => r.date))].sort();
+  let streak = 0, best = 0;
+  for (let i = 0; i < ds.length; i++) {
+    streak = i && dayAdd(ds[i - 1], 1) === ds[i] ? streak + 1 : 1;
+    best = Math.max(best, streak);
+  }
+  s.bestStreak = best;
+  return s;
+}
+
+function renderYbBanner() {
+  const el = document.getElementById('yb-banner');
+  if (!el) return;
+  const ys = yearsWithData();
+  if (!ys.length) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  el.innerHTML = `
+    <div class="yb-banner-inner">
+      <div>
+        <div class="yb-banner-title">🏆 ${ys[0]} 年度账单</div>
+        <div class="yb-banner-sub">全年收支回顾 · 一页页翻给你看</div>
+      </div>
+      <span class="yb-banner-go">查看 ›</span>
+    </div>`;
+}
+
+function openYearBill(year) {
+  yb.year = year || yearsWithData()[0];
+  if (!yb.year) { toast('还没有账单，先记几笔再来吧'); return; }
+  yb.stats = yearStats(yb.year);
+  yb.page = 0;
+  renderYearBill();
+  renderYbYearSel();
+  document.getElementById('yb-wrap').classList.add('open');
+}
+
+function closeYearBill() {
+  document.getElementById('yb-wrap').classList.remove('open');
+}
+
+function renderYbYearSel() {
+  const box = document.getElementById('yb-yearsel');
+  const ys = yearsWithData();
+  box.innerHTML = ys.length > 1
+    ? ys.map(y => `<button class="yb-ychip ${y === yb.year ? 'on' : ''}" data-ybyear="${y}">${y}</button>`).join('')
+    : '';
+}
+
+function ybPageHTML(i) {
+  const s = yb.stats;
+  const art = CHARA_ARTS[(i * 3 + 1) % CHARA_ARTS.length];
+  const bal = s.income - s.expense;
+  const pct = c => s.expense ? Math.round(c / s.expense * 100) + '%' : '0%';
+  const artHTML = `<img class="yb-art ${i % 2 ? 'left' : ''}" src="${art.file}" alt="">`;
+  switch (i) {
+    case 0: return `
+      ${artHTML}
+      <div class="yb-kicker">· 年 度 账 单 ·</div>
+      <div class="yb-year">${s.year}</div>
+      <div class="yb-line">这一年，你在「${esc(state.profileName)}」账本里留下了痕迹</div>
+      <div class="yb-line dim">轻触屏幕或按 › 翻页</div>`;
+    case 1: return `
+      ${artHTML}
+      <div class="yb-kicker">记账足迹</div>
+      <div class="yb-big">${s.count}<span class="yb-unit">笔</span></div>
+      <div class="yb-line">覆盖了 <b>${s.days}</b> 个日子，最长连续记账 <b>${s.bestStreak}</b> 天</div>
+      ${s.bestStreak >= 7 ? '<div class="yb-quote">坚持，是最酷的事</div>' : ''}`;
+    case 2: return `
+      ${artHTML}
+      <div class="yb-kicker">全年支出</div>
+      <div class="yb-big c-expense">${fmtYuan(s.expense)}</div>
+      ${s.maxMonth ? `<div class="yb-line">最「豪」的是 <b>${s.maxMonth.m} 月</b>，花了 <b>${fmtYuan(s.maxMonth.cents)}</b></div>` : ''}
+      <div class="yb-line dim">平均每天约 ${fmtYuan(Math.round(s.expense / 365))}</div>`;
+    case 3: return `
+      ${artHTML}
+      <div class="yb-kicker">全年收入</div>
+      <div class="yb-big c-income">${fmtYuan(s.income)}</div>
+      <div class="yb-line">收支相抵，结余 <b class="${bal >= 0 ? 'c-income' : 'c-expense'}">${fmtYuan(bal)}</b></div>
+      <div class="yb-quote">${bal >= 0 ? '守岸人为你守住了钱包 🌊' : '新的一年，一起把钱包填满'}</div>`;
+    case 4: {
+      if (!s.maxExpense) return `
+        ${artHTML}
+        <div class="yb-kicker">最大的一笔</div>
+        <div class="yb-line">这一年没有支出记录</div>`;
+      const r = s.maxExpense, c = catOf('expense', r.category);
+      return `
+      ${artHTML}
+      <div class="yb-kicker">最大的一笔支出</div>
+      <div class="yb-big">${fmtYuan(r.amountCents)}</div>
+      <div class="yb-line">${r.date} · ${c.name}${r.note ? ' · ' + esc(r.note) : ''}</div>
+      <div class="yb-line dim">占全年支出 ${pct(r.amountCents)}</div>`;
+    }
+    case 5: {
+      if (!s.topCats.length) return `
+        ${artHTML}
+        <div class="yb-kicker">支出排行榜</div>
+        <div class="yb-line">这一年没有支出记录</div>`;
+      return `
+      ${artHTML}
+      <div class="yb-kicker">支出排行榜 TOP3</div>
+      <div class="yb-rank">${s.topCats.map((c, idx) => `
+        <div class="yb-rank-row">
+          <span class="yb-rank-no">${idx + 1}</span>
+          <img src="${c.avatar}" alt="${c.name}" onerror="this.style.display='none'">
+          <div class="yb-rank-main">
+            <div class="yb-rank-name">${c.name} · ${c.n} 笔</div>
+            <div class="yb-rank-bar"><div class="yb-rank-fill" style="width:${s.expense ? Math.round(c.cents / s.expense * 100) : 0}%;background:${c.color}"></div></div>
+          </div>
+          <span class="yb-rank-val">${fmtYuan(c.cents)}<span class="yb-rank-pct">${pct(c.cents)}</span></span>
+        </div>`).join('')}</div>`;
+    }
+    default: return `
+      ${artHTML}
+      <div class="yb-kicker">${s.year}，辛苦啦</div>
+      <div class="yb-line" style="font-size:19px;font-weight:700">${+s.year + 1} 年，继续一起记账吧</div>
+      <div class="yb-quote">每一笔认真记下的账，都是在认真生活</div>
+      <div>
+        <button class="yb-btn" data-ybreplay>再看一遍</button>
+        <button class="yb-btn" data-ybclose>完成</button>
+      </div>`;
+  }
+}
+
+function renderYearBill() {
+  document.getElementById('yb-stage').innerHTML = `<div class="yb-page">${ybPageHTML(yb.page)}</div>`;
+  document.getElementById('yb-dots').innerHTML =
+    Array.from({ length: yb.pages }, (_, i) => `<span class="yb-dot ${i === yb.page ? 'on' : ''}"></span>`).join('');
+  document.getElementById('yb-prev').disabled = yb.page === 0;
+  document.getElementById('yb-next').disabled = yb.page === yb.pages - 1;
+}
+
+function ybGo(delta) {
+  const next = Math.min(yb.pages - 1, Math.max(0, yb.page + delta));
+  if (next !== yb.page) { yb.page = next; renderYearBill(); }
 }
 
 /* ==================== 记一笔弹层 ==================== */
@@ -1597,6 +1972,57 @@ function init() {
     updateSettingsUI();
     renderAll();
     toast(`账期已设为每月 ${day} 号开始`);
+  });
+
+  // 账单导入（微信/支付宝 CSV）
+  document.getElementById('btn-bill-import').addEventListener('click', () =>
+    document.getElementById('bill-file').click());
+  document.getElementById('bill-file').addEventListener('change', onBillFile);
+  document.getElementById('bill-preview').addEventListener('click', e => {
+    if (e.target.id === 'btn-bill-cancel') { billImport = null; renderBillPreview(); }
+    else if (e.target.id === 'btn-bill-go') doBillImport();
+  });
+  document.getElementById('bill-preview').addEventListener('change', e => {
+    const sel = e.target.closest('.imp-cat');
+    if (!sel || !billImport) return;
+    const it = billImport.items.find(x => x.key === sel.dataset.k);
+    if (it) it.cat = sel.value;
+  });
+
+  // 年度账单
+  document.getElementById('yb-banner').addEventListener('click', () => openYearBill());
+  document.getElementById('yb-close').addEventListener('click', closeYearBill);
+  document.getElementById('yb-overlay').addEventListener('click', () => ybGo(1));
+  document.getElementById('yb-prev').addEventListener('click', () => ybGo(-1));
+  document.getElementById('yb-next').addEventListener('click', () => ybGo(1));
+  document.getElementById('yb-yearsel').addEventListener('click', e => {
+    const b = e.target.closest('[data-ybyear]');
+    if (!b) return;
+    yb.year = b.dataset.ybyear;
+    yb.stats = yearStats(yb.year);
+    yb.page = 0;
+    renderYearBill();
+    renderYbYearSel();
+  });
+  const ybStage = document.getElementById('yb-stage');
+  ybStage.addEventListener('click', e => {
+    if (e.target.closest('[data-ybreplay]')) { yb.page = 0; renderYearBill(); }
+    else if (e.target.closest('[data-ybclose]')) closeYearBill();
+    else if (!e.target.closest('.yb-btn')) ybGo(1);   // 点内容区空白处翻下一页
+  });
+  let ybTouchX = null;
+  document.getElementById('yb-wrap').addEventListener('touchstart', e => { ybTouchX = e.touches[0].clientX; }, { passive: true });
+  document.getElementById('yb-wrap').addEventListener('touchend', e => {
+    if (ybTouchX == null) return;
+    const dx = e.changedTouches[0].clientX - ybTouchX;
+    if (Math.abs(dx) > 40) ybGo(dx < 0 ? 1 : -1);
+    ybTouchX = null;
+  }, { passive: true });
+  document.addEventListener('keydown', e => {
+    if (!document.getElementById('yb-wrap').classList.contains('open')) return;
+    if (e.key === 'ArrowRight') ybGo(1);
+    else if (e.key === 'ArrowLeft') ybGo(-1);
+    else if (e.key === 'Escape') closeYearBill();
   });
 
   switchTab('day');

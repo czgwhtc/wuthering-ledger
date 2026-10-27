@@ -138,7 +138,8 @@ function startBackgroundRotation() {
 
 /* ==================== 状态 ==================== */
 const state = {
-  tab: 'list',
+  tab: 'day',
+  viewDate: todayStr(),
   viewMonth: todayStr().slice(0, 7),
   editingId: null,   // 正在编辑的记录 id，null 表示新增
   sheetType: 'expense',
@@ -148,6 +149,7 @@ const state = {
   profiles: null,    // { current, names: [] }
   manageMode: false, // 批量管理模式
   selectedIds: new Set(),
+  sheetFromTab: 'day',  // 记一笔是从哪个页面打开的，保存后回去
   data: null,
 };
 
@@ -243,8 +245,9 @@ function switchProfile(name) {
   saveProfiles();
   loadData();
   state.viewMonth = todayStr().slice(0, 7);
+  state.viewDate = todayStr();
   closeSheet();
-  switchTab('list');
+  switchTab('day');
   renderAll();
   toast(`已切换到「${name}」账本`);
 }
@@ -349,7 +352,45 @@ function sumsOf(records) {
 }
 
 /* ==================== 渲染 ==================== */
+function dayAdd(dateStr, delta) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + delta);
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+}
+
+/* ==================== 每日明细（今日页） ==================== */
+function renderDay() {
+  const sw = document.getElementById('day-switcher');
+  const records = state.data.records
+    .filter(r => r.date === state.viewDate)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const isToday = state.viewDate === todayStr();
+
+  sw.innerHTML = `
+    <button class="ms-btn" data-act="dprev" aria-label="前一天">‹</button>
+    <div class="ms-label">${dayLabel(state.viewDate).replace(' · 今天', '')}
+      <input type="date" id="day-jump" value="${state.viewDate}" aria-label="选择日期">
+      ${isToday ? '' : '<button class="ms-now" data-act="dnow">回今天</button>'}
+    </div>
+    <button class="ms-btn" data-act="dnext" aria-label="后一天">›</button>`;
+
+  const { income, expense } = sumsOf(records);
+  document.getElementById('day-summary-card').innerHTML = `
+    <div class="summary-grid">
+      <div class="sum-item"><span class="sum-label">支出</span><span class="sum-val c-expense">${fmtYuan(expense)}</span></div>
+      <div class="sum-item"><span class="sum-label">收入</span><span class="sum-val c-income">${fmtYuan(income)}</span></div>
+      <div class="sum-item"><span class="sum-label">结余</span><span class="sum-val ${income - expense >= 0 ? '' : 'c-expense'}">${fmtYuan(income - expense)}</span></div>
+    </div>
+    <div class="day-count">${records.length ? `共 ${records.length} 笔` : ''}</div>`;
+
+  const box = document.getElementById('day-record-list');
+  box.innerHTML = records.length
+    ? records.map(rowHTML).join('')
+    : `<div class="empty"><div class="empty-icon">🌤️</div><div>${isToday ? '今天还没有账单' : '这一天没有账单'}</div><div class="empty-hint">点击下方 ＋ 记一笔吧</div></div>`;
+}
+
 function renderAll() {
+  renderDay();
   renderMonthSwitchers();
   renderList();
   renderCharts();
@@ -368,7 +409,7 @@ function monthSwitcherHTML() {
 }
 
 function renderMonthSwitchers() {
-  document.querySelectorAll('.month-switcher')
+  document.querySelectorAll('.month-switcher:not(.day-switcher)')
     .forEach(el => { el.innerHTML = monthSwitcherHTML(); });
 }
 
@@ -645,6 +686,7 @@ let deleteTimer = null;
 
 function openSheet(record) {
   state.editingId = record ? record.id : null;
+  state.sheetFromTab = state.tab;
   state.sheetType = record ? record.type : 'expense';
   document.getElementById('sheet-title').textContent = record ? '编辑账单' : '记一笔';
   document.getElementById('amount-input').value = record ? record.amountCents / 100 : '';
@@ -700,7 +742,8 @@ function saveSheet() {
   }
   saveData();
   state.viewMonth = date.slice(0, 7);
-  switchTab('list');
+  state.viewDate = date;
+  switchTab(state.sheetFromTab || 'day');
   closeSheet();
   renderAll();
   toast('已保存');
@@ -1182,14 +1225,36 @@ function init() {
     if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); saveSheet(); }
   });
 
-  // 月份切换（两处开关共用，事件委托）
+  // 日期切换（今日页）与月份切换（两处开关共用，事件委托）
   document.addEventListener('click', e => {
+    const dsw = e.target.closest('[data-act="dprev"], [data-act="dnext"], [data-act="dnow"]');
+    if (dsw) {
+      const act = dsw.dataset.act;
+      state.viewDate = act === 'dnow' ? todayStr() : dayAdd(state.viewDate, act === 'dprev' ? -1 : 1);
+      renderDay();
+      return;
+    }
     const ms = e.target.closest('.ms-btn, .ms-now');
-    if (!ms) return;
-    state.viewMonth = ms.dataset.act === 'now'
-      ? todayStr().slice(0, 7)
-      : monthAdd(state.viewMonth, ms.dataset.act === 'prev' ? -1 : 1);
-    renderAll();
+    if (ms) {
+      const act = ms.dataset.act;
+      state.viewMonth = act === 'now' ? todayStr().slice(0, 7) : monthAdd(state.viewMonth, act === 'prev' ? -1 : 1);
+      renderAll();
+    }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.id === 'day-jump' && /^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) {
+      state.viewDate = e.target.value;
+      renderDay();
+    }
+  });
+
+  // 今日页账单行 → 编辑
+  document.getElementById('day-record-list').addEventListener('click', e => {
+    if (state.manageMode) return;
+    const row = e.target.closest('.record-row');
+    if (!row) return;
+    const rec = state.data.records.find(r => r.id === row.dataset.id);
+    if (rec) openSheet(rec);
   });
 
   // 点击账单行 → 批量模式下选择，普通模式下编辑；管理条按钮
@@ -1275,7 +1340,7 @@ function init() {
     }
   });
 
-  switchTab('list');
+  switchTab('day');
   renderAll();
   initAutoSync();
   // PWA：注册 Service Worker（https / localhost 下生效，本地 file:// 无需）

@@ -1288,9 +1288,17 @@ function openSheet(record) {
 }
 
 function pickRandomCharaArt() {
-  const art = CHARA_ARTS[Math.floor(Math.random() * CHARA_ARTS.length)];
-  document.getElementById('chara-art').src = art.file;
+  const img = document.getElementById('chara-art');
+  let art;
+  do {
+    art = CHARA_ARTS[Math.floor(Math.random() * CHARA_ARTS.length)];
+  } while (CHARA_ARTS.length > 1 && art.file === img.getAttribute('src'));
+  img.src = art.file;
   document.getElementById('chara-name').textContent = art.name;
+  // 重新触发入场动画
+  img.style.animation = 'none';
+  void img.offsetHeight;
+  img.style.animation = '';
 }
 
 function closeSheet() {
@@ -2052,6 +2060,9 @@ function init() {
     el.addEventListener('click', () => openSub(el.dataset.sub)));
   document.querySelectorAll('.back-btn').forEach(el =>
     el.addEventListener('click', closeSub));
+
+  // 记一笔弹层：点立绘换一张
+  document.querySelector('.sheet-chara').addEventListener('click', pickRandomCharaArt);
 
   switchTab('day');
   renderAll();

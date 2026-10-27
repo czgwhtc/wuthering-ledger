@@ -1771,6 +1771,21 @@ function switchTab(tab) {
     .forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.view')
     .forEach(v => v.classList.toggle('active', v.id === 'view-' + tab));
+  closeSettings();  // 切换主页面时收起设置子页
+}
+
+/* 设置子页（从「我的」进入，导航栏仍高亮「我的」） */
+function openSettings() {
+  switchTab('me');
+  document.getElementById('view-me').classList.remove('active');
+  document.getElementById('view-settings').classList.add('active');
+}
+
+function closeSettings() {
+  const el = document.getElementById('view-settings');
+  if (!el || !el.classList.contains('active')) return;
+  el.classList.remove('active');
+  if (state.tab === 'me') document.getElementById('view-me').classList.add('active');
 }
 
 let toastTimer = null;
@@ -2024,6 +2039,10 @@ function init() {
     else if (e.key === 'ArrowLeft') ybGo(-1);
     else if (e.key === 'Escape') closeYearBill();
   });
+
+  // 设置子页入口与返回
+  document.getElementById('set-entry').addEventListener('click', openSettings);
+  document.getElementById('btn-settings-back').addEventListener('click', closeSettings);
 
   switchTab('day');
   renderAll();

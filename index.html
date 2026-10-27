@@ -44,6 +44,20 @@
       <div class="card" id="bars-card"></div>
     </section>
 
+    <!-- 搜索 -->
+    <section class="view" id="view-search">
+      <div class="page-title">搜索</div>
+      <div class="card">
+        <div class="search-bar">
+          <svg class="search-ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input id="search-input" type="search" placeholder="搜备注、分类、角色、金额、日期" autocomplete="off">
+          <button id="btn-search" class="btn-mini">搜一下</button>
+        </div>
+        <div id="search-history"></div>
+      </div>
+      <div class="card"><div id="search-results"></div></div>
+    </section>
+
     <!-- 账本子页 -->
     <section class="subview" id="view-profiles">
       <div class="page-title-row">
@@ -248,6 +262,7 @@
           · 每日明细：进入即看当天账单，可翻任意日期<br>
           · 账单导入：微信 / 支付宝 CSV 一键批量入账（设置页）<br>
           · 年度账单：全年收支回顾，翻页查看（图表页顶部）<br>
+          · 搜索：备注 / 分类 / 角色 / 金额 / 日期一搜即达<br>
           · 周期账单：房租/订阅每月自动记入（设置里开关）<br>
           · 日预算支持剩余额度结转（设置里开关）<br>
           · 账期起始日：可按发薪日记账期（设置里开关）<br>
@@ -278,6 +293,9 @@
     </button>
     <button class="tab-btn" data-tab="charts">
       <svg viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg><span>图表</span>
+    </button>
+    <button class="tab-btn" data-tab="search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>搜索</span>
     </button>
     <button class="tab-btn" data-tab="me">
       <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>我的</span>

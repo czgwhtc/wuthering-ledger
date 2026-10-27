@@ -711,7 +711,9 @@ function openSheet(record) {
   state.sheetType = record ? record.type : 'expense';
   document.getElementById('sheet-title').textContent = record ? '编辑账单' : '记一笔';
   document.getElementById('amount-input').value = record ? record.amountCents / 100 : '';
-  document.getElementById('date-input').value = record ? record.date : todayStr();
+  // 今日页打开时，默认日期跟随当前查看的日期
+  document.getElementById('date-input').value = record ? record.date
+    : (state.tab === 'day' ? state.viewDate : todayStr());
   document.getElementById('note-input').value = record ? record.note : '';
   document.getElementById('btn-delete').classList.toggle('hidden', !record);
   resetDeleteBtn();

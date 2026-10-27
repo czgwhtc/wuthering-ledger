@@ -1771,20 +1771,27 @@ function switchTab(tab) {
     .forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.view')
     .forEach(v => v.classList.toggle('active', v.id === 'view-' + tab));
-  closeSettings();  // 切换主页面时收起设置子页
+  closeSub();  // 切换主页面时收起子页
 }
 
-/* 设置子页（从「我的」进入，导航栏仍高亮「我的」） */
-function openSettings() {
+/* 子页（账本/云同步/预算/数据管理/设置，都从「我的」进入，导航栏仍高亮「我的」） */
+let openSubId = null;
+
+function openSub(id) {
   switchTab('me');
   document.getElementById('view-me').classList.remove('active');
-  document.getElementById('view-settings').classList.add('active');
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('active');
+    openSubId = id;
+  }
 }
 
-function closeSettings() {
-  const el = document.getElementById('view-settings');
-  if (!el || !el.classList.contains('active')) return;
-  el.classList.remove('active');
+function closeSub() {
+  if (!openSubId) return;
+  const el = document.getElementById(openSubId);
+  if (el) el.classList.remove('active');
+  openSubId = null;
   if (state.tab === 'me') document.getElementById('view-me').classList.add('active');
 }
 
@@ -2040,9 +2047,11 @@ function init() {
     else if (e.key === 'Escape') closeYearBill();
   });
 
-  // 设置子页入口与返回
-  document.getElementById('set-entry').addEventListener('click', openSettings);
-  document.getElementById('btn-settings-back').addEventListener('click', closeSettings);
+  // 子页入口与返回（账本/云同步/预算/数据管理/设置）
+  document.querySelectorAll('.sub-entry').forEach(el =>
+    el.addEventListener('click', () => openSub(el.dataset.sub)));
+  document.querySelectorAll('.back-btn').forEach(el =>
+    el.addEventListener('click', closeSub));
 
   switchTab('day');
   renderAll();

@@ -44,9 +44,12 @@
       <div class="card" id="bars-card"></div>
     </section>
 
-    <!-- 设置 -->
-    <section class="view" id="view-settings">
-      <div class="page-title">设置</div>
+    <!-- 设置（从「我的」进入的子页） -->
+    <section class="subview" id="view-settings">
+      <div class="page-title-row">
+        <button class="back-btn" id="btn-settings-back" aria-label="返回我的">‹</button>
+        <div class="page-title">设置</div>
+      </div>
       <div class="card">
         <div class="card-title">账单导入 · 微信 / 支付宝</div>
         <div class="set-desc" style="margin-bottom:10px">
@@ -114,6 +117,18 @@
         </div>
         <div class="card-hint">每个账本的数据完全独立、互不可见。多人共用同一台电脑的浏览器时，各自用各自的账本即可；不同设备打开网址则天然隔离。</div>
       </div>
+      <div class="card set-entry" id="set-entry" role="button" tabindex="0">
+        <div class="set-entry-row">
+          <span class="set-entry-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </span>
+          <div class="set-entry-main">
+            <div class="set-entry-title">设置</div>
+            <div class="set-entry-sub">账单导入 · 周期账单 · 账期起始日 · 预算结转</div>
+          </div>
+          <span class="set-entry-go">›</span>
+        </div>
+      </div>
       <div class="card" id="sync-card">
         <div class="card-title">云同步 · 手机电脑互通</div>
         <div id="sync-body"></div>
@@ -141,7 +156,7 @@
       <div class="card">
         <div class="card-title">关于</div>
         <div class="card-hint">
-          记账本 v5.0 · 鸣潮主题记账<br>
+          记账本 v5.1 · 鸣潮主题记账<br>
           · 每日明细：进入即看当天账单，可翻任意日期<br>
           · 账单导入：微信 / 支付宝 CSV 一键批量入账（设置页）<br>
           · 年度账单：全年收支回顾，翻页查看（图表页顶部）<br>
@@ -175,9 +190,6 @@
     </button>
     <button class="tab-btn" data-tab="charts">
       <svg viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg><span>图表</span>
-    </button>
-    <button class="tab-btn" data-tab="settings">
-      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2.2"/><circle cx="15" cy="12" r="2.2"/><circle cx="7" cy="18" r="2.2"/></svg><span>设置</span>
     </button>
     <button class="tab-btn" data-tab="me">
       <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>我的</span>

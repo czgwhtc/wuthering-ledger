@@ -288,6 +288,31 @@
   <div class="sheet-wrap" id="sheet-wrap">
     <div class="overlay" id="overlay"></div>
     <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="记一笔">
+      <div class="sheet-wave" aria-hidden="true">
+        <svg viewBox="0 0 520 210" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="waveA" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#4c6ef5" stop-opacity="0"/>
+              <stop offset=".25" stop-color="#4c6ef5" stop-opacity=".5"/>
+              <stop offset=".7" stop-color="#12b886" stop-opacity=".4"/>
+              <stop offset="1" stop-color="#12b886" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="waveFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#4c6ef5" stop-opacity=".14"/>
+              <stop offset="1" stop-color="#4c6ef5" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0,168 C60,150 120,185 200,165 C280,145 350,180 430,160 C470,150 500,160 520,155 L520,210 L0,210 Z" fill="url(#waveFill)"/>
+          <path d="M0,140 C70,105 140,170 230,135 C320,100 400,165 520,125" fill="none" stroke="url(#waveA)" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M0,170 C60,148 130,190 220,168 C310,146 390,182 520,150" fill="none" stroke="#4c6ef5" stroke-opacity=".16" stroke-width="2" stroke-linecap="round"/>
+          <path d="M0,110 C90,138 160,88 260,122 C350,152 420,112 520,140" fill="none" stroke="#4c6ef5" stroke-opacity=".1" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M0,190 C80,178 150,200 240,188 C330,176 410,196 520,184" fill="none" stroke="#12b886" stroke-opacity=".18" stroke-width="1.6" stroke-linecap="round"/>
+          <line x1="36" y1="96" x2="120" y2="96" stroke="#4c6ef5" stroke-opacity=".22" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="396" y1="82" x2="484" y2="82" stroke="#12b886" stroke-opacity=".2" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="238" cy="133" r="3" fill="#4c6ef5" fill-opacity=".3"/>
+          <circle cx="416" cy="162" r="2.4" fill="#12b886" fill-opacity=".28"/>
+        </svg>
+      </div>
       <div class="sheet-form">
         <div class="sheet-head">
           <h3 id="sheet-title">记一笔</h3>

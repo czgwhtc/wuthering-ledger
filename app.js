@@ -189,6 +189,43 @@ function monthAdd(m, delta) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 }
 
+/* ==================== 账期（可配置起始日） ==================== */
+function periodStartDay() {
+  const s = state.data.settings;
+  return (s.monthStartOn === true && s.monthStartDay >= 1 && s.monthStartDay <= 28)
+    ? s.monthStartDay : 1;
+}
+
+/* 日期 → 所属账期（用起始月 YYYY-MM 表示） */
+function periodOfDate(dateStr) {
+  const d0 = periodStartDay();
+  if (d0 === 1) return dateStr.slice(0, 7);
+  return +dateStr.slice(8, 10) >= d0 ? dateStr.slice(0, 7) : monthAdd(dateStr.slice(0, 7), -1);
+}
+
+function currentPeriodKey() { return periodOfDate(todayStr()); }
+
+/* 期 → [起始日, 结束日] */
+function periodRange(pk) {
+  const d0 = periodStartDay();
+  const start = `${pk}-${pad(d0)}`;
+  const end = dayAdd(`${monthAdd(pk, 1)}-${pad(d0)}`, -1);
+  return [start, end];
+}
+
+function periodLabel(pk) {
+  const d0 = periodStartDay();
+  if (d0 === 1) return `${+pk.slice(0, 4)}年${+pk.slice(5, 7)}月`;
+  const [s, e] = periodRange(pk);
+  return `${s.slice(0, 4)}.${+s.slice(5, 7)}.${+s.slice(8, 10)}–${+e.slice(5, 7)}.${+e.slice(8, 10)}`;
+}
+
+/* 图表用的短标签：自然月 "10月"，自定义 "9.15" */
+function periodBarLabel(pk) {
+  const d0 = periodStartDay();
+  return d0 === 1 ? `${+pk.slice(5, 7)}月` : `${+pk.slice(5, 7)}.${d0}`;
+}
+
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 function dayLabel(dateStr) {
   const [y, mo, da] = dateStr.split('-').map(Number);
@@ -312,6 +349,8 @@ function normalizeData(obj) {
     data.settings.budgetUpdatedAt = +obj.settings.budgetUpdatedAt || 0;
     data.settings.recurringOn = obj.settings.recurringOn !== false;
     data.settings.rolloverOn = obj.settings.rolloverOn !== false;
+    data.settings.monthStartOn = obj.settings.monthStartOn === true;
+    data.settings.monthStartDay = Math.min(28, Math.max(1, +obj.settings.monthStartDay || 1));
     if (Array.isArray(obj.settings.recurring)) {
       data.settings.recurring = obj.settings.recurring
         .filter(b => b && +b.amountCents > 0 && +b.day >= 1 && +b.day <= 28)
@@ -354,9 +393,9 @@ function saveData() {
 }
 
 /* ==================== 查询 ==================== */
-function recordsOfMonth(m) {
+function recordsOfMonth(pk) {
   return state.data.records
-    .filter(r => r.date.slice(0, 7) === m)
+    .filter(r => periodOfDate(r.date) === pk)
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
 }
 
@@ -382,22 +421,25 @@ function initRecurring() {
   const s = state.data.settings;
   if (!s.recurringOn || !Array.isArray(s.recurring) || !s.recurring.length) return;
   const today = todayStr();
-  const ym = today.slice(0, 7);
-  const todayDay = +today.slice(8, 10);
+  const pk = currentPeriodKey();
+  const d0 = periodStartDay();
   let added = 0;
   for (const b of s.recurring) {
-    if (+b.day > todayDay) continue;        // 本月还没到日子
-    if (b.lastGen === ym) continue;         // 本月已生成过
-    const exists = state.data.records.some(r => r.recurringId === b.id && r.date.startsWith(ym));
+    if (!(+b.day >= 1 && +b.day <= 28) || !+b.amountCents) continue;
+    // 账单日落在本期内的具体日期：日 ≥ 起始日 → 本月，否则 → 下月
+    const occur = +b.day >= d0 ? `${pk}-${pad(+b.day)}` : `${monthAdd(pk, 1)}-${pad(+b.day)}`;
+    if (occur > today) continue;          // 本期还没到日子
+    if (b.lastGen === pk) continue;       // 本期已生成过
+    const exists = state.data.records.some(r => r.recurringId === b.id && periodOfDate(r.date) === pk);
     if (!exists) {
       state.data.records.push({
         id: uid(), type: 'expense', amountCents: b.amountCents, category: b.category,
-        date: `${ym}-${pad(+b.day)}`, note: b.name,
+        date: occur, note: b.name,
         createdAt: Date.now(), updatedAt: Date.now(), recurringId: b.id,
       });
       added++;
     }
-    b.lastGen = ym;
+    b.lastGen = pk;
   }
   if (added) { saveData(); toast(`周期账单已自动记入 ${added} 笔`); }
 }
@@ -410,8 +452,14 @@ function updateSettingsUI() {
   const s = state.data.settings;
   const swR = document.getElementById('sw-recurring');
   const swO = document.getElementById('sw-rollover');
+  const swM = document.getElementById('sw-monthstart');
   if (swR) swR.classList.toggle('on', s.recurringOn !== false);
   if (swO) swO.classList.toggle('on', s.rolloverOn !== false);
+  if (swM) swM.classList.toggle('on', s.monthStartOn === true);
+  const msInput = document.getElementById('ms-day');
+  if (msInput && document.activeElement !== msInput) {
+    msInput.value = s.monthStartOn === true ? (s.monthStartDay || 1) : '';
+  }
   renderRecurringList();
   fillRecCatOptions();
 }
@@ -507,16 +555,17 @@ function renderDay() {
   let dayBudgetHTML = '';
   const budget = state.data.settings.monthlyBudget;
   if (budget > 0) {
-    const ym = state.viewDate.slice(0, 7);
-    const dayN = +state.viewDate.slice(8, 10);
-    const days = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate();
+    const pk = periodOfDate(state.viewDate);
+    const [ps, pe] = periodRange(pk);
+    const days = Math.round((new Date(pe) - new Date(ps)) / 86400000) + 1;
     const base = Math.round(budget / days);
     const rolloverOn = state.data.settings.rolloverOn !== false;
     let dayBudget = base, carry = 0, carryText = '';
     if (rolloverOn) {
       const cumSpentBefore = state.data.records.reduce((sum, r) =>
-        sum + (r.type === 'expense' && r.date.startsWith(ym) && +r.date.slice(8, 10) < dayN ? r.amountCents : 0), 0);
-      carry = base * (dayN - 1) - cumSpentBefore;
+        sum + (r.type === 'expense' && r.date >= ps && r.date < state.viewDate ? r.amountCents : 0), 0);
+      const daysBefore = Math.round((new Date(state.viewDate) - new Date(ps)) / 86400000);
+      carry = base * daysBefore - cumSpentBefore;
       dayBudget = Math.max(0, base + carry);
       if (carry !== 0) carryText = `（含结转 ${carry > 0 ? '+' : '-'}${fmtYuan(Math.abs(carry), false)}）`;
     }
@@ -530,7 +579,7 @@ function renderDay() {
       <div class="budget">
         <div class="budget-text ${cls}">${txt}</div>
         <div class="bbar"><div class="bfill ${cls}" style="width:${Math.min(100, pct)}%"></div></div>
-        <div class="budget-sub">按月预算 ${fmtYuan(budget)} ÷ ${days} 天均摊${rolloverOn ? '，盈亏自动结转' : ''}</div>
+        <div class="budget-sub">按月预算 ${fmtYuan(budget)} ÷ 账期 ${days} 天均摊${rolloverOn ? '，盈亏自动结转' : ''}</div>
       </div>`;
   }
 
@@ -559,13 +608,14 @@ function renderAll() {
 }
 
 function monthSwitcherHTML() {
-  const isNow = state.viewMonth === todayStr().slice(0, 7);
+  const custom = periodStartDay() !== 1;
+  const isNow = state.viewMonth === currentPeriodKey();
   return `
-    <button class="ms-btn" data-act="prev" aria-label="上个月">‹</button>
-    <div class="ms-label">${+state.viewMonth.slice(0, 4)}年${+state.viewMonth.slice(5, 7)}月
-      ${isNow ? '' : '<button class="ms-now" data-act="now">回本月</button>'}
+    <button class="ms-btn" data-act="prev" aria-label="上一期">‹</button>
+    <div class="ms-label">${periodLabel(state.viewMonth)}
+      ${isNow ? '' : `<button class="ms-now" data-act="now">${custom ? '回本期' : '回本月'}</button>`}
     </div>
-    <button class="ms-btn" data-act="next" aria-label="下个月">›</button>`;
+    <button class="ms-btn" data-act="next" aria-label="下一期">›</button>`;
 }
 
 function renderMonthSwitchers() {
@@ -736,7 +786,7 @@ function rowHTML(r) {
 function renderCharts() {
   const records = recordsOfMonth(state.viewMonth);
   const expense = sumsOf(records).expense;
-  const monthNum = +state.viewMonth.slice(5, 7);
+  const donutTitle = periodBarLabel(state.viewMonth);
 
   // 分类占比环形图
   const byCat = {};
@@ -748,8 +798,8 @@ function renderCharts() {
     .sort((a, b) => b.cents - a.cents);
 
   document.getElementById('donut-card').innerHTML = `
-    <div class="card-title">支出分类 · ${monthNum}月</div>
-    ${donutSVG(items, expense, monthNum)}
+    <div class="card-title">支出分类 · ${donutTitle}</div>
+    ${donutSVG(items, expense, donutTitle)}
     <div class="legend">${items.map(it => `
       <div class="legend-row">
         <span class="dot" style="background:${it.color}"></span>
@@ -760,15 +810,15 @@ function renderCharts() {
       </div>`).join('')}
     </div>`;
 
-  // 近 6 个月收支趋势
+  // 近 6 期收支趋势
   const rows = [];
   for (let i = 5; i >= 0; i--) {
-    const m = monthAdd(state.viewMonth, -i);
-    const s = sumsOf(recordsOfMonth(m));
-    rows.push({ m, income: s.income, expense: s.expense });
+    const pk = monthAdd(state.viewMonth, -i);
+    const s = sumsOf(recordsOfMonth(pk));
+    rows.push({ m: pk, label: periodBarLabel(pk), income: s.income, expense: s.expense });
   }
   document.getElementById('bars-card').innerHTML = `
-    <div class="card-title">近 6 个月收支趋势</div>
+    <div class="card-title">${periodStartDay() === 1 ? '近 6 个月' : '近 6 期'}收支趋势</div>
     ${barsSVG(rows)}
     <div class="chart-legend">
       <span><i class="dot" style="background:var(--income)"></i>收入</span>
@@ -818,13 +868,13 @@ function barsSVG(rows) {
     const cx = x0 + slot * i + slot / 2;
     const hIn = Math.max(r.income > 0 ? 3 : 0, r.income / maxVal * plotH);
     const hEx = Math.max(r.expense > 0 ? 3 : 0, r.expense / maxVal * plotH);
-    const mLabel = +r.m.slice(5, 7) + '月';
+    const mLabel = r.label || (+r.m.slice(5, 7) + '月');
     out += `
       <rect x="${(cx - groupW / 2).toFixed(1)}" y="${(yBase - hIn).toFixed(1)}" width="${barW}" height="${hIn.toFixed(1)}" rx="3" class="bar-income"><title>${mLabel}收入 ${fmtYuan(r.income)}</title></rect>
       <rect x="${(cx - groupW / 2 + barW + gap).toFixed(1)}" y="${(yBase - hEx).toFixed(1)}" width="${barW}" height="${hEx.toFixed(1)}" rx="3" class="bar-expense"><title>${mLabel}支出 ${fmtYuan(r.expense)}</title></rect>
       <text x="${cx.toFixed(1)}" y="${yBase + 16}" text-anchor="middle" class="svg-month">${mLabel}</text>`;
   });
-  return `<svg class="bars" viewBox="0 0 ${W} ${H}" role="img" aria-label="近6个月收支趋势">${out}</svg>`;
+  return `<svg class="bars" viewBox="0 0 ${W} ${H}" role="img" aria-label="近6期收支趋势">${out}</svg>`;
 }
 
 function renderMe() {
@@ -1400,7 +1450,7 @@ function init() {
     const ms = e.target.closest('.ms-btn, .ms-now');
     if (ms) {
       const act = ms.dataset.act;
-      state.viewMonth = act === 'now' ? todayStr().slice(0, 7) : monthAdd(state.viewMonth, act === 'prev' ? -1 : 1);
+      state.viewMonth = act === 'now' ? currentPeriodKey() : monthAdd(state.viewMonth, act === 'prev' ? -1 : 1);
       renderAll();
     }
   });
@@ -1524,6 +1574,29 @@ function init() {
   document.getElementById('recurring-list').addEventListener('click', e => {
     const btn = e.target.closest('[data-rec]');
     if (btn) onRecDeleteClick(btn);
+  });
+  // 账期起始日
+  document.getElementById('sw-monthstart').addEventListener('click', () => {
+    const s = state.data.settings;
+    s.monthStartOn = s.monthStartOn !== true;
+    if (s.monthStartOn === true && !(s.monthStartDay >= 1 && s.monthStartDay <= 28)) s.monthStartDay = 15;
+    saveData();
+    state.viewMonth = currentPeriodKey();
+    updateSettingsUI();
+    renderAll();
+    toast(s.monthStartOn === true ? `账期已按每月 ${s.monthStartDay} 号开始` : '已恢复自然月');
+  });
+  document.getElementById('btn-ms-save').addEventListener('click', () => {
+    const day = Math.round(+document.getElementById('ms-day').value);
+    if (!(day >= 1 && day <= 28)) { toast('起始日请填 1-28'); return; }
+    const s = state.data.settings;
+    s.monthStartDay = day;
+    s.monthStartOn = true;
+    saveData();
+    state.viewMonth = currentPeriodKey();
+    updateSettingsUI();
+    renderAll();
+    toast(`账期已设为每月 ${day} 号开始`);
   });
 
   switchTab('day');

@@ -280,7 +280,10 @@ function deleteProfile(name) {
 
 /* ==================== 存储层（按账本分键） ==================== */
 function defaultData() {
-  return { version: 1, records: [], settings: { monthlyBudget: 0 }, deleted: {} };
+  return {
+    version: 1, records: [], deleted: {},
+    settings: { monthlyBudget: 0, recurring: [], recurringOn: true, rolloverOn: true },
+  };
 }
 
 function isValidRecord(r) {
@@ -301,11 +304,26 @@ function normalizeData(obj) {
       note: String(r.note || '').slice(0, 100),
       createdAt: +r.createdAt || Date.now(),
       updatedAt: +r.updatedAt || +r.createdAt || Date.now(),
+      recurringId: r.recurringId ? String(r.recurringId) : undefined,
     }));
   }
   if (obj && obj.settings && isFinite(+obj.settings.monthlyBudget)) {
     data.settings.monthlyBudget = Math.max(0, Math.round(+obj.settings.monthlyBudget));
     data.settings.budgetUpdatedAt = +obj.settings.budgetUpdatedAt || 0;
+    data.settings.recurringOn = obj.settings.recurringOn !== false;
+    data.settings.rolloverOn = obj.settings.rolloverOn !== false;
+    if (Array.isArray(obj.settings.recurring)) {
+      data.settings.recurring = obj.settings.recurring
+        .filter(b => b && +b.amountCents > 0 && +b.day >= 1 && +b.day <= 28)
+        .map(b => ({
+          id: String(b.id || uid()),
+          name: String(b.name || '周期账单').slice(0, 12),
+          amountCents: Math.round(+b.amountCents),
+          category: String(b.category || 'other'),
+          day: Math.round(+b.day),
+          lastGen: b.lastGen || null,
+        }));
+    }
   }
   if (obj && obj.deleted && typeof obj.deleted === 'object') {
     data.deleted = {};
@@ -359,6 +377,115 @@ function dayAdd(dateStr, delta) {
 }
 
 /* ==================== 每日明细（今日页） ==================== */
+/* ==================== 周期账单 ==================== */
+function initRecurring() {
+  const s = state.data.settings;
+  if (!s.recurringOn || !Array.isArray(s.recurring) || !s.recurring.length) return;
+  const today = todayStr();
+  const ym = today.slice(0, 7);
+  const todayDay = +today.slice(8, 10);
+  let added = 0;
+  for (const b of s.recurring) {
+    if (+b.day > todayDay) continue;        // 本月还没到日子
+    if (b.lastGen === ym) continue;         // 本月已生成过
+    const exists = state.data.records.some(r => r.recurringId === b.id && r.date.startsWith(ym));
+    if (!exists) {
+      state.data.records.push({
+        id: uid(), type: 'expense', amountCents: b.amountCents, category: b.category,
+        date: `${ym}-${pad(+b.day)}`, note: b.name,
+        createdAt: Date.now(), updatedAt: Date.now(), recurringId: b.id,
+      });
+      added++;
+    }
+    b.lastGen = ym;
+  }
+  if (added) { saveData(); toast(`周期账单已自动记入 ${added} 笔`); }
+}
+
+/* ==================== 设置页 ==================== */
+let recDeleteArmed = null;
+let recDeleteTimer = null;
+
+function updateSettingsUI() {
+  const s = state.data.settings;
+  const swR = document.getElementById('sw-recurring');
+  const swO = document.getElementById('sw-rollover');
+  if (swR) swR.classList.toggle('on', s.recurringOn !== false);
+  if (swO) swO.classList.toggle('on', s.rolloverOn !== false);
+  renderRecurringList();
+  fillRecCatOptions();
+}
+
+function fillRecCatOptions() {
+  const sel = document.getElementById('rec-cat');
+  if (!sel || sel.options.length) return;
+  sel.innerHTML = CATEGORIES.expense.map(c => `<option value="${c.key}">${c.icon} ${c.name}</option>`).join('');
+}
+
+function renderRecurringList() {
+  const box = document.getElementById('recurring-list');
+  if (!box) return;
+  const list = state.data.settings.recurring || [];
+  if (!list.length) {
+    box.innerHTML = `<div class="set-desc" style="padding:8px 0 2px">还没有周期账单，用下面一行添加</div>`;
+    return;
+  }
+  box.innerHTML = list.map(b => {
+    const c = catOf('expense', b.category);
+    const armed = recDeleteArmed === b.id;
+    return `
+    <div class="rec-row">
+      <div class="cat-badge" style="--c:${c.color}">${catAvatarHTML(c)}</div>
+      <div class="rec-info">
+        <div class="rec-title-line">${esc(b.name)}</div>
+        <div class="rec-sub-line">每月 ${b.day} 号 · ${fmtYuan(b.amountCents)}</div>
+      </div>
+      <button class="profile-btn danger ${armed ? 'armed' : ''}" data-rec="${b.id}">${armed ? '确认' : '删除'}</button>
+    </div>`;
+  }).join('');
+}
+
+function addRecurring() {
+  const name = document.getElementById('rec-name').value.trim();
+  const cents = parseYuanToCents(document.getElementById('rec-amount').value.trim());
+  const day = Math.round(+document.getElementById('rec-day').value);
+  const category = document.getElementById('rec-cat').value;
+  if (!name) { toast('请填名称'); return; }
+  if (!cents) { toast('请填正确的金额'); return; }
+  if (!(day >= 1 && day <= 28)) { toast('日期请填 1-28 号'); return; }
+  const s = state.data.settings;
+  s.recurring = s.recurring || [];
+  s.recurring.push({ id: uid(), name, amountCents: cents, category, day, lastGen: null });
+  s.recurringOn = true;
+  saveData();
+  document.getElementById('rec-name').value = '';
+  document.getElementById('rec-amount').value = '';
+  document.getElementById('rec-day').value = '';
+  initRecurring();
+  updateSettingsUI();
+  renderAll();
+  toast('已添加周期账单');
+}
+
+function onRecDeleteClick(btn) {
+  const id = btn.dataset.rec;
+  if (recDeleteArmed !== id) {
+    recDeleteArmed = id;
+    clearTimeout(recDeleteTimer);
+    recDeleteTimer = setTimeout(() => { recDeleteArmed = null; renderRecurringList(); }, 2500);
+    renderRecurringList();
+  } else {
+    recDeleteArmed = null;
+    clearTimeout(recDeleteTimer);
+    const s = state.data.settings;
+    s.recurring = (s.recurring || []).filter(b => b.id !== id);
+    saveData();
+    renderRecurringList();
+    renderAll();
+    toast('已删除周期账单（已生成的历史账单保留）');
+  }
+}
+
 function renderDay() {
   const sw = document.getElementById('day-switcher');
   const records = state.data.records
@@ -376,23 +503,34 @@ function renderDay() {
 
   const { income, expense } = sumsOf(records);
 
-  // 日预算：月预算均摊到当月每天
+  // 日预算：月预算均摊到当月每天；开启结转后按当月累计盈亏滚动
   let dayBudgetHTML = '';
   const budget = state.data.settings.monthlyBudget;
   if (budget > 0) {
-    const days = new Date(+state.viewDate.slice(0, 4), +state.viewDate.slice(5, 7), 0).getDate();
-    const dayBudget = Math.round(budget / days);
-    const pct = Math.min(999, Math.round(expense / dayBudget * 100));
+    const ym = state.viewDate.slice(0, 7);
+    const dayN = +state.viewDate.slice(8, 10);
+    const days = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate();
+    const base = Math.round(budget / days);
+    const rolloverOn = state.data.settings.rolloverOn !== false;
+    let dayBudget = base, carry = 0, carryText = '';
+    if (rolloverOn) {
+      const cumSpentBefore = state.data.records.reduce((sum, r) =>
+        sum + (r.type === 'expense' && r.date.startsWith(ym) && +r.date.slice(8, 10) < dayN ? r.amountCents : 0), 0);
+      carry = base * (dayN - 1) - cumSpentBefore;
+      dayBudget = Math.max(0, base + carry);
+      if (carry !== 0) carryText = `（含结转 ${carry > 0 ? '+' : '-'}${fmtYuan(Math.abs(carry), false)}）`;
+    }
+    const pct = dayBudget > 0 ? Math.min(999, Math.round(expense / dayBudget * 100)) : 999;
     const cls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
     const remain = dayBudget - expense;
     const txt = remain >= 0
-      ? `日预算 ${fmtYuan(dayBudget)} · 已用 ${pct}% · 剩余 ${fmtYuan(remain)}`
-      : `日预算 ${fmtYuan(dayBudget)} · 已超支 ${fmtYuan(-remain)}`;
+      ? `日预算 ${fmtYuan(dayBudget)}${carryText} · 已用 ${pct}% · 剩余 ${fmtYuan(remain)}`
+      : `日预算 ${fmtYuan(dayBudget)}${carryText} · 已超支 ${fmtYuan(-remain)}`;
     dayBudgetHTML = `
       <div class="budget">
         <div class="budget-text ${cls}">${txt}</div>
         <div class="bbar"><div class="bfill ${cls}" style="width:${Math.min(100, pct)}%"></div></div>
-        <div class="budget-sub">按月预算 ${fmtYuan(budget)} ÷ ${days} 天均摊</div>
+        <div class="budget-sub">按月预算 ${fmtYuan(budget)} ÷ ${days} 天均摊${rolloverOn ? '，盈亏自动结转' : ''}</div>
       </div>`;
   }
 
@@ -417,6 +555,7 @@ function renderAll() {
   renderCharts();
   renderMe();
   renderProfiles();
+  updateSettingsUI();
 }
 
 function monthSwitcherHTML() {
@@ -587,7 +726,7 @@ function rowHTML(r) {
       ${check}
       <div class="cat-badge" style="--c:${c.color}" title="${c.chara}">${catAvatarHTML(c)}</div>
       <div class="rec-main">
-        <div class="rec-title">${title}</div>
+        <div class="rec-title">${r.recurringId ? '<span class="rec-flag" title="周期账单">🔁</span>' : ''}${title}</div>
         ${sub ? `<div class="rec-sub">${sub}</div>` : ''}
       </div>
       <div class="rec-amount ${r.type === 'income' ? 'c-income' : 'c-expense'}">${sign}${fmtYuan(r.amountCents)}</div>
@@ -1227,6 +1366,7 @@ function shake(id) {
 function init() {
   loadProfiles();
   loadData();
+  initRecurring();
   applyRandomBackground();
   initMusic();
 
@@ -1361,6 +1501,29 @@ function init() {
       renderSyncCard();
       toast('已断开（本机令牌已清除，云端数据保留）');
     }
+  });
+
+  // 设置页：开关与周期账单
+  document.getElementById('sw-recurring').addEventListener('click', () => {
+    const s = state.data.settings;
+    s.recurringOn = s.recurringOn === false;
+    saveData();
+    updateSettingsUI();
+    if (s.recurringOn !== false) { initRecurring(); renderAll(); }
+    toast(s.recurringOn !== false ? '周期账单已开启' : '周期账单已暂停');
+  });
+  document.getElementById('sw-rollover').addEventListener('click', () => {
+    const s = state.data.settings;
+    s.rolloverOn = s.rolloverOn === false;
+    saveData();
+    updateSettingsUI();
+    renderDay();
+    toast(s.rolloverOn !== false ? '日预算结转已开启' : '日预算结转已关闭');
+  });
+  document.getElementById('btn-rec-add').addEventListener('click', addRecurring);
+  document.getElementById('recurring-list').addEventListener('click', e => {
+    const btn = e.target.closest('[data-rec]');
+    if (btn) onRecDeleteClick(btn);
   });
 
   switchTab('day');

@@ -25,24 +25,12 @@ const CATEGORIES = {
   ],
 };
 
-/* 记一笔弹层的角色立绘池（39 位五星限定全员），每次打开随机展示一张 */
+/* 记一笔弹层的角色立绘池（27 位 2.x 角色·官网全身渲染图；1.x 老角色只在壁纸轮换中出现），每次打开随机展示一张 */
 const CHARA_ARTS = [
-  { file: 'assets/chara/art-1.png', name: '守岸人' },
-  { file: 'assets/chara/art-2.png', name: '长离' },
-  { file: 'assets/chara/art-3.png', name: '珂莱塔' },
-  { file: 'assets/chara/art-4.png', name: '今汐' },
-  { file: 'assets/chara/art-5.png', name: '坎特蕾拉' },
-  { file: 'assets/chara/art-6.png', name: '椿' },
   { file: 'assets/chara/art-7.webp', name: '爱弥斯' },
   { file: 'assets/chara/art-8.webp', name: '心' },
   { file: 'assets/chara/art-9.webp', name: '尤诺' },
   { file: 'assets/chara/art-10.webp', name: '弗洛洛' },
-  { file: 'assets/chara/art-11.png', name: '忌炎' },
-  { file: 'assets/chara/art-12.png', name: '吟霖' },
-  { file: 'assets/chara/art-13.png', name: '折枝' },
-  { file: 'assets/chara/art-14.png', name: '相里要' },
-  { file: 'assets/chara/art-15.png', name: '洛可可' },
-  { file: 'assets/chara/art-16.png', name: '菲比' },
   { file: 'assets/chara/art-17.webp', name: '布兰特' },
   { file: 'assets/chara/art-18.webp', name: '赞妮' },
   { file: 'assets/chara/art-19.webp', name: '夏空' },

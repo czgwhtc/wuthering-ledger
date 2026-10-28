@@ -1,6 +1,6 @@
 /* 记账本 Service Worker：缓存全部静态资源，装成 App 后离线可用
    注意：改动静态文件后请把 CACHE 版本号 +1，用户端才会更新 */
-const CACHE = 'ledger-v26';
+const CACHE = 'ledger-v27';
 const CORE = [
   './',
   './index.html',
@@ -11,8 +11,6 @@ const CORE = [
   './assets/icon-512.png',
   './assets/icon-maskable-512.png',
   './assets/music/bgm.mp3',
-  './assets/chara/art-1.png', './assets/chara/art-2.png', './assets/chara/art-3.png',
-  './assets/chara/art-4.png', './assets/chara/art-5.png', './assets/chara/art-6.png',
   './assets/chara/art-7.webp', './assets/chara/art-8.webp', './assets/chara/art-9.webp',
   './assets/chara/art-10.webp',
   './assets/chara/av-food.png', './assets/chara/av-transport.png', './assets/chara/av-shopping.png',

@@ -650,9 +650,12 @@ main { padding: 18px 16px 130px; }
 .splash-fm{display:flex;align-items:center;gap:8px;color:#9fd8ff;font-size:13px;letter-spacing:.25em;font-family:ui-monospace,Consolas,monospace;animation:splashIn .6s .3s both}
 .splash-dot{width:6px;height:6px;background:#ff7ab8;box-shadow:0 0 8px #ff7ab8;animation:dotBlink 1s steps(2) infinite}
 @keyframes dotBlink{50%{opacity:.15}}
-.splash-bar{width:150px;height:8px;padding:2px;border:2px solid rgba(159,216,255,.55);animation:splashIn .6s .45s both}
-.splash-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#7ec8ff,#ff9ecf);animation:barFill 1.05s .25s ease-out forwards}
+.splash-bar{position:relative;width:150px;height:8px;padding:2px;border:2px solid rgba(159,216,255,.55);animation:splashIn .6s .45s both}
+.splash-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff4fa8,#ff9ecf),repeating-linear-gradient(90deg,rgba(255,255,255,.35) 0 2px,transparent 2px 5px);box-shadow:0 0 10px rgba(255,122,184,.75);animation:barFill 1.05s .25s ease-out forwards,laserFlow .45s .25s linear infinite}
+.splash-bar b{position:absolute;top:0;left:2px;width:3px;height:12px;background:#fff;border-radius:1px;box-shadow:0 0 6px #ff7ab8,0 0 14px #ff7ab8,0 0 24px rgba(255,122,184,.85);opacity:0;animation:laserHead 1.05s .25s ease-out forwards}
 @keyframes barFill{to{width:100%}}
+@keyframes laserFlow{to{background-position:0 0,15px 0}}
+@keyframes laserHead{0%{left:2px;opacity:0}6%{opacity:1}92%{opacity:1}100%{left:151px;opacity:0}}
 .splash-scan{position:absolute;inset:0;pointer-events:none;opacity:.14;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(160,210,255,.5) 3px 4px)}
 @keyframes splashIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.splash-pix img,.splash-dot,.splash-bar i{animation:none}.splash-bar i{width:100%}}
+@media (prefers-reduced-motion:reduce){.splash-pix img,.splash-dot,.splash-bar i,.splash-bar b{animation:none}.splash-bar i{width:100%}.splash-bar b{display:none}}

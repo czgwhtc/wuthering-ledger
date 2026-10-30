@@ -651,8 +651,10 @@ main { padding: 18px 16px 130px; }
 .splash-dot{width:6px;height:6px;background:#ff7ab8;box-shadow:0 0 8px #ff7ab8;animation:dotBlink 1s steps(2) infinite}
 @keyframes dotBlink{50%{opacity:.15}}
 .splash-bar{position:relative;width:170px;height:10px;padding:2px;border:2px solid rgba(159,216,255,.55);background:rgba(19,28,48,.55);animation:splashIn .6s .45s both}
-.splash-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff3d9a 0%,#ff6fb5 45%,#ffb3d9 100%);box-shadow:0 0 8px rgba(255,79,168,.95),0 0 18px rgba(255,79,168,.5);animation:barFill 1.15s .25s cubic-bezier(.3,.6,.4,1) forwards}
+.splash-bar i{display:block;height:100%;width:0;overflow:hidden;background:linear-gradient(90deg,#ff2d95 0%,#ff5fae 45%,#ffa8d2 100%);box-shadow:0 0 9px rgba(255,45,149,.95),0 0 20px rgba(255,79,168,.55);animation:barFill 1.15s .25s cubic-bezier(.3,.6,.4,1) forwards}
+.splash-bar i::after{content:'';display:block;height:100%;width:45%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:barSheen .55s linear infinite}
 @keyframes barFill{to{width:100%}}
+@keyframes barSheen{from{transform:translateX(-100%)}to{transform:translateX(230%)}}
 .splash-scan{position:absolute;inset:0;pointer-events:none;opacity:.14;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(160,210,255,.5) 3px 4px)}
 @keyframes splashIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.splash-pix img,.splash-dot,.splash-bar i{animation:none}.splash-bar i{width:100%}}
+@media (prefers-reduced-motion:reduce){.splash-pix img,.splash-dot,.splash-bar i,.splash-bar i::after{animation:none}.splash-bar i{width:100%}}

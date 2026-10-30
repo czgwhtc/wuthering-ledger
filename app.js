@@ -2253,3 +2253,18 @@ function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+/* ==================== 启动缓冲动画：最早 1.5s、等 window.load 后淡出 ==================== */
+(function () {
+  const splash = document.getElementById('splash');
+  if (!splash) return;
+  const minT = new Promise(r => setTimeout(r, 1500));
+  const loaded = document.readyState === 'complete'
+    ? Promise.resolve()
+    : new Promise(r => window.addEventListener('load', r, { once: true }));
+  Promise.all([minT, loaded]).then(() => {
+    splash.classList.add('off');
+    splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+    setTimeout(() => { if (splash.parentNode) splash.remove(); }, 1300); // 兜底
+  });
+})();

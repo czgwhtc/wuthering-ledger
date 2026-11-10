@@ -293,12 +293,13 @@ function saveProfiles() {
 }
 
 function switchProfile(name) {
+  exitManageMode();
   saveData();  // 保存当前账本
   state.profileName = name;
   state.profiles.current = name;
   saveProfiles();
   loadData();
-  state.viewMonth = todayStr().slice(0, 7);
+  state.viewMonth = currentPeriodKey();
   state.viewDate = todayStr();
   closeSheet();
   switchTab('day');
@@ -318,6 +319,7 @@ function createProfile(name) {
 
 function deleteProfile(name) {
   if (state.profiles.names.length <= 1) { toast('至少保留一个账本'); return; }
+  exitManageMode();
   state.profiles.names = state.profiles.names.filter(n => n !== name);
   try { localStorage.removeItem(dataKey(name)); } catch (e) { /* ignore */ }
   if (state.profileName === name) {
@@ -325,6 +327,8 @@ function deleteProfile(name) {
     state.profiles.current = state.profileName;
     saveProfiles();
     loadData();
+    state.viewMonth = currentPeriodKey();
+    state.viewDate = todayStr();
   } else {
     saveProfiles();
   }
@@ -601,9 +605,9 @@ function renderDay() {
     <div class="day-count">${records.length ? `共 ${records.length} 笔` : ''}</div>`;
 
   const box = document.getElementById('day-record-list');
-  box.innerHTML = records.length
+  box.innerHTML = (state.manageMode ? manageBarHTML(records) : '') + (records.length
     ? records.map(rowHTML).join('')
-    : `<div class="empty"><div class="empty-icon">🌤️</div><div>${isToday ? '今天还没有账单' : '这一天没有账单'}</div><div class="empty-hint">点击下方 ＋ 记一笔吧</div></div>`;
+    : `<div class="empty"><div class="empty-icon">🌤️</div><div>${isToday ? '今天还没有账单' : '这一天没有账单'}</div><div class="empty-hint">点击下方 ＋ 记一笔吧</div></div>`);
 }
 
 function renderAll() {
@@ -666,7 +670,7 @@ function searchRecords(q) {
     const amt = r.amountCents / 100;
     return (r.note || '').toLowerCase().includes(q) ||
       c.name.toLowerCase().includes(q) ||
-      c.chara.toLowerCase().includes(q) ||
+      (c.chara || '').toLowerCase().includes(q) ||
       r.date.includes(q) ||
       (isFinite(num) && num > 0 && Math.abs(amt - num) < 0.005);
   }).sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
@@ -705,6 +709,7 @@ function renderSearchResults() {
     cur.records.push(r);
   }
   box.innerHTML = `
+    ${state.manageMode ? manageBarHTML(rows) : ''}
     <div class="search-summary">共 <b>${rows.length}</b> 笔 · 支出 <b class="c-expense">${fmtYuan(expense, false)}</b> · 收入 <b class="c-income">${fmtYuan(income, false)}</b></div>
     ${groups.map(g => `
       <div class="day-group">
@@ -738,12 +743,21 @@ function renderMonthSwitchers() {
 let batchDeleteArmed = false;
 let batchDeleteTimer = null;
 
-function enterManageMode() {
+function visibleRecords() {
+  if (state.tab === 'day') return state.data.records.filter(r => r.date === state.viewDate);
+  if (state.tab === 'search') return searchRecords(document.getElementById('search-input').value || '');
+  return recordsOfMonth(state.viewMonth);
+}
+
+function renderRecordViews() { renderDay(); renderList(); renderSearchResults(); }
+
+function enterManageMode(id) {
   state.manageMode = true;
   state.selectedIds.clear();
+  if (typeof id === 'string' && visibleRecords().some(r => r.id === id)) state.selectedIds.add(id);
   resetBatchDelete();
   document.getElementById('fab-add').classList.add('hidden');
-  renderList();
+  renderRecordViews();
 }
 
 function exitManageMode() {
@@ -753,6 +767,8 @@ function exitManageMode() {
   resetBatchDelete();
   document.getElementById('fab-add').classList.remove('hidden');
   renderList();
+  renderDay();
+  renderSearch();
 }
 
 function resetBatchDelete() {
@@ -764,7 +780,7 @@ function toggleSelect(id) {
   if (state.selectedIds.has(id)) state.selectedIds.delete(id);
   else state.selectedIds.add(id);
   resetBatchDelete();
-  renderList();
+  renderRecordViews();
 }
 
 function toggleSelectAll(records) {
@@ -772,22 +788,25 @@ function toggleSelectAll(records) {
   if (allSel) records.forEach(r => state.selectedIds.delete(r.id));
   else records.forEach(r => state.selectedIds.add(r.id));
   resetBatchDelete();
-  renderList();
+  renderRecordViews();
 }
 
 function onBatchDeleteClick() {
-  const n = state.selectedIds.size;
+  // 只删除当前视图可见的勾选记录，防止残留选择造成误删。
+  const ids = new Set(visibleRecords()
+    .filter(r => state.selectedIds.has(r.id)).map(r => r.id));
+  const n = ids.size;
   if (!n) { toast('请先选择要删除的账单'); return; }
   if (!batchDeleteArmed) {
     batchDeleteArmed = true;
     clearTimeout(batchDeleteTimer);
-    batchDeleteTimer = setTimeout(() => { batchDeleteArmed = false; renderList(); }, 2500);
-    renderList();
+    batchDeleteTimer = setTimeout(() => { batchDeleteArmed = false; renderRecordViews(); }, 2500);
+    renderRecordViews();
     return;
   }
   state.data.deleted = state.data.deleted || {};
-  for (const id of state.selectedIds) state.data.deleted[id] = Date.now();
-  state.data.records = state.data.records.filter(r => !state.selectedIds.has(r.id));
+  for (const id of ids) state.data.deleted[id] = Date.now();
+  state.data.records = state.data.records.filter(r => !ids.has(r.id));
   saveData();
   exitManageMode();
   renderAll();
@@ -798,17 +817,17 @@ function manageBarHTML(records) {
   if (!state.manageMode) {
     return `<div class="manage-bar">
       <span class="manage-hint">本月共 ${records.length} 笔</span>
-      <button class="manage-btn" id="btn-enter-manage">批量删除</button>
+      <button class="manage-btn" data-manage="enter">批量删除</button>
     </div>`;
   }
   const n = records.filter(r => state.selectedIds.has(r.id)).length;
   const allSel = n === records.length && n > 0;
   return `<div class="manage-bar managing">
-    <button class="manage-btn" id="btn-select-all">${allSel ? '取消全选' : '全选'}</button>
+    <button class="manage-btn" data-manage="all">${allSel ? '取消全选' : '全选'}</button>
     <span class="manage-hint">已选 ${n} 笔</span>
     <span class="manage-group">
-      <button class="manage-btn danger ${batchDeleteArmed ? 'armed' : ''}" id="btn-batch-del" ${n ? '' : 'disabled'}>${batchDeleteArmed ? '确认删除' : '删除'}</button>
-      <button class="manage-btn" id="btn-exit-manage">完成</button>
+      <button class="manage-btn danger ${batchDeleteArmed ? 'armed' : ''}" data-manage="delete" ${n ? '' : 'disabled'}>${batchDeleteArmed ? '确认删除' : '删除'}</button>
+      <button class="manage-btn" data-manage="exit">完成</button>
     </span>
   </div>`;
 }
@@ -842,7 +861,7 @@ function renderList() {
 
   const listBox = document.getElementById('record-list');
   if (records.length === 0) {
-    listBox.innerHTML = `
+    listBox.innerHTML = (state.manageMode ? manageBarHTML(records) : '') + `
       <div class="empty">
         <div class="empty-icon">🧾</div>
         <div>本月还没有账单</div>
@@ -871,6 +890,7 @@ function renderList() {
 }
 
 function catAvatarHTML(c) {
+  if (!c.avatar) return `<span aria-hidden="true">${c.icon}</span>`;
   return `<img src="${c.avatar}" alt="${c.name}" title="${c.chara}" loading="lazy" onerror="this.outerHTML='${c.icon}'">`;
 }
 
@@ -883,7 +903,7 @@ function rowHTML(r) {
   const check = state.manageMode
     ? `<div class="sel-check ${checked ? 'on' : ''}">${checked ? '✓' : ''}</div>` : '';
   return `
-    <div class="record-row ${state.manageMode ? 'selectable' : ''}" data-id="${r.id}" role="button" tabindex="0">
+    <div class="record-row ${state.manageMode ? 'selectable' : ''}" data-id="${esc(r.id)}" role="button" tabindex="0">
       ${check}
       <div class="cat-badge" style="--c:${c.color}" title="${c.chara}">${catAvatarHTML(c)}</div>
       <div class="rec-main">
@@ -955,7 +975,7 @@ function donutSVG(items, totalCents, monthNum) {
   return `
   <svg class="donut" viewBox="0 0 200 200" role="img" aria-label="支出分类占比">
     ${body}
-    <text x="100" y="92" text-anchor="middle" class="svg-label">${monthNum}月支出</text>
+    <text x="100" y="92" text-anchor="middle" class="svg-label">${monthNum} · 支出</text>
     <text x="100" y="116" text-anchor="middle" class="svg-total">${fmtYuan(totalCents)}</text>
   </svg>`;
 }
@@ -1456,7 +1476,7 @@ function saveSheet() {
     });
   }
   saveData();
-  state.viewMonth = date.slice(0, 7);
+  state.viewMonth = periodOfDate(date);
   state.viewDate = date;
   switchTab(state.sheetFromTab || 'day');
   closeSheet();
@@ -1533,9 +1553,10 @@ function importJSON(e) {
       if (!obj || !Array.isArray(obj.records)) throw new Error('bad format');
       const normalized = normalizeData(obj);
       if (!confirm(`备份中有 ${normalized.records.length} 笔账单，导入后将覆盖当前全部数据，确定继续吗？`)) return;
+      exitManageMode();
       state.data = normalized;
       saveData();
-      state.viewMonth = todayStr().slice(0, 7);
+      state.viewMonth = currentPeriodKey();
       renderAll();
       toast('导入成功');
     } catch (err) {
@@ -1894,6 +1915,7 @@ function onProfileAction(btn) {
 
 /* ==================== 交互与初始化 ==================== */
 function switchTab(tab) {
+  if (tab !== state.tab) exitManageMode();
   state.tab = tab;
   document.querySelectorAll('.tab-btn')
     .forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
@@ -1945,6 +1967,7 @@ function shake(id) {
 function init() {
   loadProfiles();
   loadData();
+  state.viewMonth = currentPeriodKey();
   initRecurring();
   applyRandomBackground();
   initMusic();
@@ -1971,6 +1994,7 @@ function init() {
   document.addEventListener('click', e => {
     const dsw = e.target.closest('[data-act="dprev"], [data-act="dnext"], [data-act="dnow"]');
     if (dsw) {
+      exitManageMode();
       const act = dsw.dataset.act;
       state.viewDate = act === 'dnow' ? todayStr() : dayAdd(state.viewDate, act === 'dprev' ? -1 : 1);
       renderDay();
@@ -1978,6 +2002,7 @@ function init() {
     }
     const ms = e.target.closest('.ms-btn, .ms-now');
     if (ms) {
+      exitManageMode();
       const act = ms.dataset.act;
       state.viewMonth = act === 'now' ? currentPeriodKey() : monthAdd(state.viewMonth, act === 'prev' ? -1 : 1);
       renderAll();
@@ -1985,6 +2010,7 @@ function init() {
   });
   document.addEventListener('change', e => {
     if (e.target.id === 'day-jump' && /^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) {
+      exitManageMode();
       state.viewDate = e.target.value;
       renderDay();
     }
@@ -2125,6 +2151,7 @@ function init() {
   const sDrop = document.getElementById('search-history');
   let searchTimer = null;
   sInput.addEventListener('input', () => {
+    exitManageMode();
     hideSearchDrop();
     clearTimeout(searchTimer);
     searchTimer = setTimeout(renderSearchResults, 200);
@@ -2150,6 +2177,7 @@ function init() {
     }
     const item = e.target.closest('.search-drop-item');
     if (item) {
+      exitManageMode();
       sInput.value = item.dataset.q;
       hideSearchDrop();
       renderSearchResults();
@@ -2227,27 +2255,31 @@ function init() {
   switchTab('day');
   renderAll();
   initAutoSync();
-  // PWA：注册 Service Worker（https / localhost 下生效，本地 file:// 无需）
-  if ('serviceWorker' in navigator &&
-      (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
   if (!state.storageOk) toast('注意：当前浏览器无法保存数据');
 }
 
 document.addEventListener('DOMContentLoaded', init);
 
-/* ==================== 启动缓冲动画：最早 1.5s、等 window.load 后淡出 ==================== */
+/* ==================== 启动页：页面就绪即退出，不等待图片或音乐加载 ==================== */
 (function () {
   const splash = document.getElementById('splash');
   if (!splash) return;
-  const minT = new Promise(r => setTimeout(r, 1500));
-  const loaded = document.readyState === 'complete'
-    ? Promise.resolve()
-    : new Promise(r => window.addEventListener('load', r, { once: true }));
-  Promise.all([minT, loaded]).then(() => {
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
+    clearTimeout(maxTimer);
     splash.classList.add('off');
-    splash.addEventListener('transitionend', () => splash.remove(), { once: true });
-    setTimeout(() => { if (splash.parentNode) splash.remove(); }, 1300); // 兜底
-  });
+    splash.addEventListener('transitionend', e => {
+      if (e.target === splash) splash.remove();
+    });
+    setTimeout(() => splash.remove(), 650);
+  };
+  const maxTimer = setTimeout(dismiss, 2500);
+  const minT = new Promise(r => setTimeout(r, 650));
+  const ready = document.readyState !== 'loading'
+    ? Promise.resolve()
+    : new Promise(r => document.addEventListener('DOMContentLoaded', r, { once: true }));
+  Promise.all([minT, ready]).then(dismiss);
 })();
+

@@ -336,7 +336,7 @@ function deleteProfile(name) {
 function defaultData() {
   return {
     version: 1, records: [], deleted: {},
-    settings: { monthlyBudget: 0, recurring: [], recurringOn: true, rolloverOn: true },
+    settings: { monthlyBudget: 0, recurring: [], recurringOn: true },
   };
 }
 
@@ -366,7 +366,6 @@ function normalizeData(obj) {
     data.settings.monthlyBudget = Math.max(0, Math.round(+obj.settings.monthlyBudget));
     data.settings.budgetUpdatedAt = +obj.settings.budgetUpdatedAt || 0;
     data.settings.recurringOn = obj.settings.recurringOn !== false;
-    data.settings.rolloverOn = obj.settings.rolloverOn !== false;
     data.settings.monthStartOn = obj.settings.monthStartOn === true;
     data.settings.monthStartDay = Math.min(28, Math.max(1, +obj.settings.monthStartDay || 1));
     if (Array.isArray(obj.settings.recurring)) {
@@ -469,10 +468,8 @@ let recDeleteTimer = null;
 function updateSettingsUI() {
   const s = state.data.settings;
   const swR = document.getElementById('sw-recurring');
-  const swO = document.getElementById('sw-rollover');
   const swM = document.getElementById('sw-monthstart');
   if (swR) swR.classList.toggle('on', s.recurringOn !== false);
-  if (swO) swO.classList.toggle('on', s.rolloverOn !== false);
   if (swM) swM.classList.toggle('on', s.monthStartOn === true);
   const msInput = document.getElementById('ms-day');
   if (msInput && document.activeElement !== msInput) {
@@ -569,35 +566,29 @@ function renderDay() {
 
   const { income, expense } = sumsOf(records);
 
-  // 日预算：月预算均摊到当月每天；开启结转后按当月累计盈亏滚动
+  // 日预算：本期截至前一天的剩余预算 ÷ 本期总天数，不扣当天及之后的支出
   let dayBudgetHTML = '';
   const budget = state.data.settings.monthlyBudget;
   if (budget > 0) {
     const pk = periodOfDate(state.viewDate);
     const [ps, pe] = periodRange(pk);
     const days = Math.round((new Date(pe) - new Date(ps)) / 86400000) + 1;
-    const base = Math.round(budget / days);
-    const rolloverOn = state.data.settings.rolloverOn !== false;
-    let dayBudget = base, carry = 0, carryText = '';
-    if (rolloverOn) {
-      const cumSpentBefore = state.data.records.reduce((sum, r) =>
-        sum + (r.type === 'expense' && r.date >= ps && r.date < state.viewDate ? r.amountCents : 0), 0);
-      const daysBefore = Math.round((new Date(state.viewDate) - new Date(ps)) / 86400000);
-      carry = base * daysBefore - cumSpentBefore;
-      dayBudget = Math.max(0, base + carry);
-      if (carry !== 0) carryText = `（含结转 ${carry > 0 ? '+' : '-'}${fmtYuan(Math.abs(carry), false)}）`;
-    }
-    const pct = dayBudget > 0 ? Math.min(999, Math.round(expense / dayBudget * 100)) : 999;
+    const priorExpense = sumsOf(recordsOfMonth(pk).filter(r => r.date < state.viewDate)).expense;
+    const periodRemaining = Math.max(0, budget - priorExpense);
+    const dayBudget = Math.round(periodRemaining / days);
+    const pct = dayBudget > 0
+      ? Math.min(999, Math.round(expense / dayBudget * 100))
+      : (expense > 0 ? 999 : 0);
     const cls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
     const remain = dayBudget - expense;
     const txt = remain >= 0
-      ? `日预算 ${fmtYuan(dayBudget)}${carryText} · 已用 ${pct}% · 剩余 ${fmtYuan(remain)}`
-      : `日预算 ${fmtYuan(dayBudget)}${carryText} · 已超支 ${fmtYuan(-remain)}`;
+      ? `日预算 ${fmtYuan(dayBudget)} · 已用 ${pct}% · 剩余 ${fmtYuan(remain)}`
+      : `日预算 ${fmtYuan(dayBudget)} · 已超支 ${fmtYuan(-remain)}`;
     dayBudgetHTML = `
       <div class="budget">
         <div class="budget-text ${cls}">${txt}</div>
         <div class="bbar"><div class="bfill ${cls}" style="width:${Math.min(100, pct)}%"></div></div>
-        <div class="budget-sub">按月预算 ${fmtYuan(budget)} ÷ 账期 ${days} 天均摊${rolloverOn ? '，盈亏自动结转' : ''}</div>
+        <div class="budget-sub">本期剩余预算 ${fmtYuan(periodRemaining)} ÷ 账期 ${days} 天（仅扣除此前支出）</div>
       </div>`;
   }
 
@@ -2099,14 +2090,6 @@ function init() {
     updateSettingsUI();
     if (s.recurringOn !== false) { initRecurring(); renderAll(); }
     toast(s.recurringOn !== false ? '周期账单已开启' : '周期账单已暂停');
-  });
-  document.getElementById('sw-rollover').addEventListener('click', () => {
-    const s = state.data.settings;
-    s.rolloverOn = s.rolloverOn === false;
-    saveData();
-    updateSettingsUI();
-    renderDay();
-    toast(s.rolloverOn !== false ? '日预算结转已开启' : '日预算结转已关闭');
   });
   document.getElementById('btn-rec-add').addEventListener('click', addRecurring);
   document.getElementById('recurring-list').addEventListener('click', e => {

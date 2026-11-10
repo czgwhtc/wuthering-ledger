@@ -257,7 +257,7 @@
       <div class="card">
         <div class="card-title">关于</div>
         <div class="card-hint">
-          记账本 v5.2 · 鸣潮主题记账<br>
+          记账本 v5.3 · 鸣潮主题记账<br>
           · 每日明细：进入即看当天账单，可翻任意日期<br>
           · 账单导入：微信 / 支付宝 CSV 一键批量入账（设置页）<br>
           · 年度账单：全年收支回顾，翻页查看（图表页顶部）<br>
@@ -374,9 +374,21 @@
   </div>
 
   <div id="toast" class="toast"></div>
+  <div id="record-menu" class="record-menu" role="menu" aria-label="账单操作" hidden>
+    <button type="button" id="record-menu-delete" role="menuitem">删除</button>
+    <button type="button" id="record-menu-multi" role="menuitem">多选</button>
+  </div>
+  <div id="app-update" class="app-update" role="status" hidden>
+    <span id="app-update-message">新版本已就绪，保存当前记账后即可更新。</span>
+    <button type="button" id="app-update-apply">更新</button>
+    <button type="button" id="app-update-dismiss" aria-label="稍后更新">稍后</button>
+  </div>
   <input type="file" id="import-file" accept=".json,application/json" hidden>
   <input type="file" id="bill-file" accept=".csv,text/csv" hidden>
 </div>
 <script src="app.js"></script>
+<script src="record-actions.js"></script>
+<script src="updates.js" async></script>
 </body>
 </html>
+

@@ -116,7 +116,7 @@ main { padding: 18px 16px 130px; }
   font-family: inherit; color-scheme: dark;
 }
 .day-count { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
-.budget-sub { font-size: 11px; color: var(--muted); margin-top: 5px; opacity: .85; }
+.budget-sub { font-size: 11px; color: #465468; margin-top: 5px; line-height: 1.55; }
 
 /* ---------- 卡片 ---------- */
 .card {
@@ -141,7 +141,7 @@ main { padding: 18px 16px 130px; }
 .c-income { color: var(--income); }
 .budget { margin-top: 14px; }
 .budget-text { font-size: 12px; margin-bottom: 6px; }
-.budget-text.ok { color: var(--muted); }
+.budget-text.ok { color: #344052; font-weight: 600; }
 .budget-text.warn { color: var(--warn); }
 .budget-text.over { color: var(--expense); font-weight: 700; }
 .bbar { height: 8px; background: rgba(20, 30, 60, .1); border-radius: 4px; overflow: hidden; }
@@ -468,6 +468,40 @@ main { padding: 18px 16px 130px; }
   opacity: 0; pointer-events: none; transition: all .25s ease; max-width: 80%;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.app-update {
+  position: fixed; left: 50%; bottom: calc(82px + env(safe-area-inset-bottom));
+  transform: translateX(-50%); z-index: 25;
+  display: flex; align-items: center; gap: 8px;
+  width: calc(100% - 32px); max-width: 488px; padding: 12px;
+  border: 1px solid #d8dfeb; border-radius: 14px;
+  background: #fff; color: #252a33; box-shadow: 0 6px 24px rgba(10,14,30,.2);
+  font-size: 13px; line-height: 1.5;
+}
+.app-update[hidden] { display: none; }
+.record-menu {
+  position: fixed; z-index: 60; width: 148px; padding: 6px;
+  background: #fff; border: 1px solid #dbe1eb; border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(10,14,30,.25);
+}
+.record-menu[hidden] { display: none; }
+.record-menu button {
+  display: block; width: 100%; min-height: 46px; padding: 10px 14px;
+  border: 0; border-radius: 8px; background: transparent; text-align: left;
+  font: inherit; font-size: 15px; color: #252a33; cursor: pointer;
+}
+.record-menu button:hover, .record-menu button:focus-visible { background: #eef1fe; }
+#record-menu-delete { color: #d93042; }
+#record-menu-delete.armed { background: #d93042; color: #fff; }
+.record-row { -webkit-touch-callout: none; user-select: none; touch-action: pan-y; }
+.record-row img { -webkit-user-drag: none; }
+.app-update span { flex: 1; min-width: 0; }
+.app-update button {
+  min-width: 44px; min-height: 44px; padding: 0 10px; flex: none;
+  border: 0; border-radius: 10px; background: #edf1ff; color: #344fbd;
+  font-family: inherit; font-weight: 700; cursor: pointer;
+}
+.app-update button:disabled { opacity: .6; cursor: default; }
+#app-update-apply { background: var(--primary); color: #fff; }
 .shake { animation: shake .35s; }
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
@@ -641,20 +675,73 @@ main { padding: 18px 16px 130px; }
 }
 
 /* ==================== 启动缓冲动画（像素爱弥斯 · 调频9072） ==================== */
-#splash{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:radial-gradient(120% 90% at 50% 12%,#2c3d5c 0%,#1b2740 58%,#131c30 100%);transition:opacity .55s ease}
-#splash.off{opacity:0;pointer-events:none}
-.splash-box{display:flex;flex-direction:column;align-items:center;gap:14px;transform:translateY(-3vh)}
-.splash-pix img{height:200px;width:auto;image-rendering:pixelated;display:block;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45));animation:pixBob .8s steps(2) infinite alternate}
-@keyframes pixBob{from{transform:translateY(0)}to{transform:translateY(-8px)}}
-.splash-name{color:#fff;font-size:26px;font-weight:700;letter-spacing:.5em;margin-right:-.5em;text-shadow:0 2px 12px rgba(120,180,255,.35);animation:splashIn .6s .15s both}
-.splash-fm{display:flex;align-items:center;gap:8px;color:#9fd8ff;font-size:13px;letter-spacing:.25em;font-family:ui-monospace,Consolas,monospace;animation:splashIn .6s .3s both}
-.splash-dot{width:6px;height:6px;background:#ff7ab8;box-shadow:0 0 8px #ff7ab8;animation:dotBlink 1s steps(2) infinite}
-@keyframes dotBlink{50%{opacity:.15}}
-.splash-bar{position:relative;width:170px;height:10px;padding:2px;border:2px solid rgba(159,216,255,.55);background:rgba(19,28,48,.55);animation:splashIn .6s .45s both}
-.splash-bar i{display:block;height:100%;width:0;overflow:hidden;background:linear-gradient(90deg,#ff2d95 0%,#ff5fae 45%,#ffa8d2 100%);box-shadow:0 0 9px rgba(255,45,149,.95),0 0 20px rgba(255,79,168,.55);animation:barFill 1.15s .25s cubic-bezier(.3,.6,.4,1) forwards}
-.splash-bar i::after{content:'';display:block;height:100%;width:45%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:barSheen .55s linear infinite}
-@keyframes barFill{to{width:100%}}
-@keyframes barSheen{from{transform:translateX(-100%)}to{transform:translateX(230%)}}
-.splash-scan{position:absolute;inset:0;pointer-events:none;opacity:.14;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(160,210,255,.5) 3px 4px)}
-@keyframes splashIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.splash-pix img,.splash-dot,.splash-bar i,.splash-bar i::after{animation:none}.splash-bar i{width:100%}}
+#splash {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(120% 90% at 50% 12%, #2c3d5c 0%, #1b2740 58%, #131c30 100%);
+  transition: opacity .55s ease;
+}
+#splash.off { opacity: 0; pointer-events: none; }
+.splash-box {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  transform: translateY(-3vh);
+}
+.splash-pix img {
+  height: 200px; width: auto; image-rendering: pixelated; display: block;
+  animation: pixBob 1s steps(2) infinite alternate;
+}
+@keyframes pixBob {
+  from { transform: translateY(0); }
+  to { transform: translateY(-4px); }
+}
+.splash-name {
+  color: #fff; font-size: 26px; font-weight: 700; letter-spacing: .5em; margin-right: -.5em;
+  text-shadow: 0 2px 12px rgba(120, 180, 255, .35);
+  animation: splashIn .6s .15s both;
+}
+.splash-fm {
+  display: flex; align-items: center; gap: 8px;
+  color: #9fd8ff; font-size: 13px; letter-spacing: .25em;
+  font-family: ui-monospace, Consolas, monospace;
+  animation: splashIn .6s .3s both;
+}
+.splash-dot {
+  width: 6px; height: 6px; background: #ff7ab8; box-shadow: 0 0 8px #ff7ab8;
+  animation: dotBlink 1s steps(2) infinite;
+}
+@keyframes dotBlink { 50% { opacity: .15; } }
+.splash-bar {
+  position: relative; width: 170px; height: 10px; padding: 2px;
+  border: 2px solid rgba(159, 216, 255, .55); background: rgba(19, 28, 48, .55);
+  animation: splashIn .6s .45s both;
+}
+.splash-bar i {
+  display: block; height: 100%; width: 0; overflow: hidden;
+  background: linear-gradient(90deg, #ff2d95 0%, #ff5fae 45%, #ffa8d2 100%);
+  box-shadow: 0 0 9px rgba(255, 45, 149, .95), 0 0 20px rgba(255, 79, 168, .55);
+  animation: barFill 1.15s .25s cubic-bezier(.3, .6, .4, 1) forwards;
+}
+.splash-bar i::after {
+  content: ''; display: block; height: 100%; width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .5), transparent);
+  animation: barSheen .55s linear infinite;
+}
+@keyframes barFill { to { width: 100%; } }
+@keyframes barSheen {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(230%); }
+}
+/* 简化全屏叠层，降低部分手机浏览器出现绘制接缝的风险。 */
+.splash-scan { display: none; }
+@keyframes splashIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #splash, #splash *, #splash *::before, #splash *::after {
+    animation: none;
+    transition: none;
+  }
+  .splash-bar i { width: 100%; }
+}
+

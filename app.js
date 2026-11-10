@@ -566,15 +566,15 @@ function renderDay() {
 
   const { income, expense } = sumsOf(records);
 
-  // 日预算：本期剩余预算（含当天支出）÷ 本期总天数
+  // 日预算：本期截至前一天的剩余预算 ÷ 本期总天数，不扣当天及之后的支出
   let dayBudgetHTML = '';
   const budget = state.data.settings.monthlyBudget;
   if (budget > 0) {
     const pk = periodOfDate(state.viewDate);
     const [ps, pe] = periodRange(pk);
     const days = Math.round((new Date(pe) - new Date(ps)) / 86400000) + 1;
-    const periodExpense = sumsOf(recordsOfMonth(pk)).expense;
-    const periodRemaining = Math.max(0, budget - periodExpense);
+    const priorExpense = sumsOf(recordsOfMonth(pk).filter(r => r.date < state.viewDate)).expense;
+    const periodRemaining = Math.max(0, budget - priorExpense);
     const dayBudget = Math.round(periodRemaining / days);
     const pct = dayBudget > 0
       ? Math.min(999, Math.round(expense / dayBudget * 100))
@@ -588,7 +588,7 @@ function renderDay() {
       <div class="budget">
         <div class="budget-text ${cls}">${txt}</div>
         <div class="bbar"><div class="bfill ${cls}" style="width:${Math.min(100, pct)}%"></div></div>
-        <div class="budget-sub">本期剩余预算 ${fmtYuan(periodRemaining)} ÷ 账期 ${days} 天（含当天支出）</div>
+        <div class="budget-sub">本期剩余预算 ${fmtYuan(periodRemaining)} ÷ 账期 ${days} 天（仅扣除此前支出）</div>
       </div>`;
   }
 

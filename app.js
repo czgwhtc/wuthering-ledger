@@ -1757,7 +1757,11 @@ async function runSync(manual) {
       state.profiles.names = [...names].filter(n => !delProfiles[n]);
       state.profiles.deletedProfiles = delProfiles;
       saveProfiles();
+      // 同步可能改变账期起始日：本期跟随今天，历史账期保留其起始日期的归属。
+      const wasCurrentPeriod = state.viewMonth === currentPeriodKey();
+      const periodAnchor = periodRange(state.viewMonth)[0];
       loadData();
+      state.viewMonth = wasCurrentPeriod ? currentPeriodKey() : periodOfDate(periodAnchor);
       renderAll();
     }
     await pushPayload();
@@ -1941,7 +1945,14 @@ function onProfileAction(btn) {
 
 /* ==================== 交互与初始化 ==================== */
 function switchTab(tab) {
+  const enteringList = tab === 'list' && state.tab !== 'list';
   if (tab !== state.tab) exitManageMode();
+  if (enteringList) {
+    state.viewMonth = currentPeriodKey();
+    renderMonthSwitchers();
+    renderList();
+    renderCharts();
+  }
   state.tab = tab;
   document.querySelectorAll('.tab-btn')
     .forEach(b => b.classList.toggle('active', b.dataset.tab === tab));

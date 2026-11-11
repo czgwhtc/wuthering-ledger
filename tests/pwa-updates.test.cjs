@@ -18,7 +18,7 @@ function response(body, ok = true) {
   return { body, ok, clone() { return response(body, ok); } };
 }
 
-function serviceWorker({ names = [], fail = [], quota = false, version = 'ledger-v43' } = {}) {
+function serviceWorker({ names = [], fail = [], quota = false, version = 'ledger-v44' } = {}) {
   const self = new Events();
   const storage = new Map(names.map(name => [name, new Map()]));
   const requests = [];
@@ -61,7 +61,7 @@ function serviceWorker({ names = [], fail = [], quota = false, version = 'ledger
   class Request {
     constructor(url, options) { this.url = keyOf(url); Object.assign(this, options); }
   }
-  vm.runInNewContext(source('sw.js').replace("const CACHE = 'ledger-v43'", `const CACHE = '${version}'`), {
+  vm.runInNewContext(source('sw.js').replace("const CACHE = 'ledger-v44'", `const CACHE = '${version}'`), {
     self, caches, Request, URL, location: { origin: 'https://example.test' },
     fetch: request => network(request)
   });
@@ -86,7 +86,7 @@ function serviceWorker({ names = [], fail = [], quota = false, version = 'ledger
 }
 
 test('install precaches the complete app shell with fresh HTTP requests and waits for consent', async () => {
-  const sw = serviceWorker({ names: ['ledger-v43'], version: 'ledger-v44' });
+  const sw = serviceWorker({ names: ['ledger-v44'], version: 'ledger-v45' });
   await sw.lifecycle('install');
   assert.equal(sw.skipped, 0);
   assert.ok(sw.requests.some(req => req.url.endsWith('/updates.js')));
@@ -101,7 +101,7 @@ test('legacy-only migration activates once; leftover legacy cache never bypasses
   const legacy = serviceWorker({ names: ['ledger-v40', 'another-app-v5'] });
   await legacy.lifecycle('install');
   assert.equal(legacy.skipped, 1);
-  const modern = serviceWorker({ names: ['ledger-v40', 'ledger-v43'], version: 'ledger-v44' });
+  const modern = serviceWorker({ names: ['ledger-v40', 'ledger-v44'], version: 'ledger-v45' });
   await modern.lifecycle('install');
   assert.equal(modern.skipped, 0);
   const first = serviceWorker();
@@ -112,17 +112,17 @@ test('legacy-only migration activates once; leftover legacy cache never bypasses
 test('optional art failure preserves offline shell; missing application JS rejects installation', async () => {
   const optional = serviceWorker({ fail: ['/bgm.mp3', '/art-7.webp'] });
   await optional.lifecycle('install');
-  assert.ok(optional.storage.get('ledger-v43').has(scope + 'index.html'));
+  assert.ok(optional.storage.get('ledger-v44').has(scope + 'index.html'));
   const critical = serviceWorker({ fail: ['/app.js'] });
   await assert.rejects(critical.lifecycle('install'), /download failed/);
   assert.equal(critical.skipped, 0);
 });
 
 test('activation deletes only this application namespace', async () => {
-  const sw = serviceWorker({ names: ['ledger-v39', 'ledger-v40', 'ledger-v43', 'another-app-v5'] });
+  const sw = serviceWorker({ names: ['ledger-v39', 'ledger-v40', 'ledger-v44', 'another-app-v5'] });
   await sw.lifecycle('activate');
   assert.deepEqual(sw.deleted.sort(), ['ledger-v39', 'ledger-v40']);
-  assert.ok(sw.storage.has('ledger-v43'));
+  assert.ok(sw.storage.has('ledger-v44'));
   assert.ok(sw.storage.has('another-app-v5'));
   assert.equal(sw.claimed, 1);
 });

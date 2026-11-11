@@ -72,9 +72,7 @@
       return;
     }
     const id = recordId;
-    state.data.deleted = state.data.deleted || {}; state.data.deleted[id] = Date.now();
-    state.data.records = state.data.records.filter(r => r.id !== id);
-    closeMenu(); saveData(); renderAll(); toast('已删除');
+    closeMenu(); deleteRecordsWithUndo(new Set([id])); renderAll();
   });
   multi.addEventListener('click', () => {
     const id = recordId; closeMenu(); suppressId = null; enterManageMode(id);

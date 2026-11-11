@@ -468,6 +468,30 @@ main { padding: 18px 16px 130px; }
   opacity: 0; pointer-events: none; transition: all .25s ease; max-width: 80%;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.delete-undo {
+  position: fixed; left: 50%; bottom: calc(150px + env(safe-area-inset-bottom));
+  transform: translateX(-50%); z-index: 65; display: flex; align-items: center; gap: 8px;
+  width: calc(100% - 32px); max-width: 488px; padding: 8px 12px;
+  background: #26324a; color: #fff; border-radius: 14px; box-shadow: 0 8px 28px #17243a33;
+  font-size: 13px;
+}
+.delete-undo[hidden] { display: none; }
+.delete-undo span { flex: 1; }
+.delete-undo button { min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.delete-undo #delete-undo-apply { background: #ffffff20; padding: 0 12px; }
+.budget-open { display: block; width: 100%; border: 0; padding: 0; text-align: left; background: transparent; font: inherit; color: inherit; cursor: pointer; border-radius: 8px; }
+.budget-open:focus-visible { outline: 2px solid var(--primary); outline-offset: 5px; }
+.budget-detail-link { display: block; margin-top: 4px; color: var(--primary); font-weight: 600; }
+.budget-dialog { border: 0; padding: 0; border-radius: 20px; width: calc(100% - 32px); max-width: 460px; max-height: 85dvh; color: #26324a; background: #fff; box-shadow: 0 16px 60px #17243a40; }
+.budget-dialog::backdrop { background: #17243a80; }
+.budget-dialog-card { padding: 20px; }
+.budget-detail-date, .budget-detail-note { color: #596578; font-size: 12px; line-height: 1.7; }
+.budget-breakdown { margin: 16px 0; font-size: 13px; }
+.budget-breakdown > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.budget-breakdown dd { margin: 0; font-weight: 700; white-space: nowrap; }
+.budget-equation { background: #f1f4fd; border-radius: 12px; padding: 12px; font-size: 13px; line-height: 1.8; }
+.budget-equation strong { display: block; color: var(--primary); }
+.budget-over-note { color: var(--expense); font-size: 13px; line-height: 1.7; }
 .app-update {
   position: fixed; left: 50%; bottom: calc(82px + env(safe-area-inset-bottom));
   transform: translateX(-50%); z-index: 25;

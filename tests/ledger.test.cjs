@@ -14,7 +14,7 @@ function setup({ splash = false, readyState = 'complete' } = {}) {
       elements.set(id, { id, value: '', innerHTML: '', textContent: '', options: [],
         classList: { add: x => classes.add(x), remove: x => classes.delete(x),
           contains: x => classes.has(x), toggle: (x, on) => on ? classes.add(x) : classes.delete(x) },
-        addEventListener() {}, focus() {}, remove() { this.removed = true; },
+        addEventListener() {}, focus() {}, showModal() { this.open = true; }, close() { this.open = false; }, remove() { this.removed = true; },
       });
     }
     return elements.get(id);
@@ -159,3 +159,64 @@ test('record IDs are escaped in markup and chart period label is not doubled', (
   assert.equal(slow.element('splash').removed, true);
   console.log('PASS splash always exits within bounded fallback');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+test('deleting and undoing restores single and bulk records with sync-safe timestamps', () => {
+  const c = setup();
+  c.sandbox.records = [record('a', '2026-11-10'), record('b', '2026-11-10'), record('keep', '2026-11-10')];
+  c.run("state.data.records = records; renderAll = () => {}; deleteRecordsWithUndo(new Set(['a', 'b']));");
+  assert.equal(c.run('state.data.records.length'), 1);
+  assert.equal(c.element('delete-undo').hidden, false);
+  assert.equal(c.element('delete-undo-message').textContent, '已删除 2 笔账单');
+  c.run('undoRecordDeletion();');
+  assert.equal(c.run('state.data.records.length'), 3);
+  assert.ok(c.run("state.data.records.find(r => r.id === 'a').updatedAt > state.data.deleted.a"));
+  c.run("remote = { records: [], deleted: {...state.data.deleted}, settings: {} }; state.data = mergeProfileData(state.data, remote);");
+  assert.equal(c.run('state.data.records.length'), 3);
+  assert.equal(c.element('delete-undo').hidden, true);
+  c.run('undoRecordDeletion();');
+  assert.equal(c.run('state.data.records.length'), 3);
+  c.run("deleteRecordsWithUndo(new Set(['a'])); undoRecordDeletion();");
+  assert.equal(c.run('state.data.records.length'), 3);
+});
+
+test('undo expires, replaces only the most recent deletion, and never crosses accounts or imports', () => {
+  const c = setup();
+  c.sandbox.records = [record('a', '2026-11-10'), record('b', '2026-11-10')];
+  c.run("state.data.records = records; renderAll = () => {}; deleteRecordsWithUndo(new Set(['a'])); deleteRecordsWithUndo(new Set(['b'])); undoRecordDeletion();");
+  assert.equal(c.run('state.data.records.length'), 1);
+  assert.equal(c.run('state.data.records[0].id'), 'b');
+  c.run("deleteRecordsWithUndo(new Set(['b'])); deleteUndo.expiresAt = 0; undoRecordDeletion();");
+  assert.equal(c.run('state.data.records.length'), 0);
+  c.run("state.data.records = records; deleteRecordsWithUndo(new Set(['a'])); state.profileName = '旅行'; undoRecordDeletion();");
+  assert.equal(c.run("state.data.records.some(r => r.id === 'a')"), false);
+  c.run("state.profileName = '默认'; state.data.records = records; deleteRecordsWithUndo(new Set(['a'])); loadData();");
+  assert.equal(c.element('delete-undo').hidden, true);
+  c.run("state.data.records = records; deleteRecordsWithUndo(new Set(['a']));");
+  c.sandbox.backupEvent = { target: { value: 'file', files: [{ text: JSON.stringify({ records: [] }) }] } };
+  c.run('importJSON(backupEvent); undoRecordDeletion();');
+  assert.equal(c.run('state.data.records.length'), 0);
+});
+
+test('undo preserves newer sync changes and does not duplicate already restored records', () => {
+  const c = setup();
+  c.sandbox.records = [record('a', '2026-11-10'), record('b', '2026-11-10')];
+  c.run("state.data.records = records; renderAll = () => {}; deleteRecordsWithUndo(new Set(['a', 'b'])); state.data.deleted.a++; state.data.records.push({...records[1], note:'其他设备恢复'}); undoRecordDeletion();");
+  assert.equal(c.run('state.data.records.length'), 1);
+  assert.equal(c.run('state.data.records[0].note'), '其他设备恢复');
+});
+
+test('budget detail matches day budget for leap years and custom periods, with distinct overages', () => {
+  const c = setup();
+  c.sandbox.records = [record('past', '2026-11-09', 320000), record('today', '2026-11-10', 1000), record('future', '2026-11-11', 500000)];
+  c.run("state.data.records = records; state.data.settings.monthlyBudget = 300000; state.viewDate = '2026-11-10'; openBudgetDetails();");
+  const html = c.element('budget-detail-content').innerHTML;
+  assert.ok(html.includes('当日超支'));
+  assert.ok(html.includes('本期截至所选日期已超预算 ¥210.00'));
+  assert.ok(html.includes('日预算 ¥0.00'));
+  assert.equal(c.element('budget-detail').open, true);
+  assert.equal(c.run("dailyBudgetDetails('2028-02-29').days"), 29);
+  c.run('state.data.settings.monthStartOn = true; state.data.settings.monthStartDay = 15;');
+  assert.equal(c.run("dailyBudgetDetails('2026-11-10').start"), '2026-10-15');
+  assert.equal(c.run("dailyBudgetDetails('2026-11-10').end"), '2026-11-14');
+  assert.equal(c.run("dailyBudgetDetails('2026-11-10').days"), 31);
+});

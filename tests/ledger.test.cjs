@@ -110,6 +110,33 @@ test('month navigation clears selection, including entering an empty month', () 
   assert.equal(c.element('fab-add').classList.contains('hidden'), false);
 });
 
+test('opening monthly details defaults to the current period while navigation inside stays selected', () => {
+  for (const [start, today, expected] of [[1, '2026-11-10', '2026-11'], [15, '2026-11-10', '2026-10'], [15, '2026-11-15', '2026-11'], [28, '2027-01-01', '2026-12']]) {
+    const c = setup();
+    c.run(`todayStr = () => '${today}'; state.data.settings.monthStartOn = true; state.data.settings.monthStartDay = ${start}; state.viewMonth = '2030-01'; switchTab('list');`);
+    assert.equal(c.run('state.viewMonth'), expected);
+    assert.ok(c.element('summary-card').innerHTML.includes('支出'));
+    c.run("state.viewMonth = '2025-08'; switchTab('list');");
+    assert.equal(c.run('state.viewMonth'), '2025-08');
+    c.run("switchTab('charts'); switchTab('list');");
+    assert.equal(c.run('state.viewMonth'), expected);
+  }
+});
+
+(async () => {
+  for (const [start, month, expected] of [[1, '2026-11', '2026-10'], [1, '2026-08', '2026-07'], [15, '2026-10', '2026-11']]) {
+    const c = setup();
+    c.sandbox.remote = { records: [], settings: { monthlyBudget: 0, monthStartOn: start === 1, monthStartDay: 15, budgetUpdatedAt: 10 } };
+    c.run(`state.data.settings.monthStartOn = true; state.data.settings.monthStartDay = ${start}; state.viewMonth = '${month}';
+      saveSyncStore({token:'test-only', pass:'test-only'});
+      fetchCloudPayload = async () => ({profiles: {'默认': remote}}); pushPayload = async () => {}; renderSyncCard = () => {};`);
+    await c.run('runSync(false)');
+    assert.equal(c.run('syncLastError'), '');
+    assert.equal(c.run('state.viewMonth'), expected);
+  }
+  console.log('PASS sync realigns current periods and preserves the date in a historical period');
+})().catch(error => { console.error(error); process.exitCode = 1; });
+
 test('unknown imported categories remain searchable and use a fallback icon', () => {
   const c = setup();
   c.sandbox.records = [{ ...record('old', '2026-11-10', 1250), category: 'legacy', note: 'coffee' }];

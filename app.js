@@ -153,6 +153,18 @@ function startBackgroundRotation() {
   });
 }
 
+/* 月度版式是本机显示偏好，不随账本同步覆盖。 */
+let monthlyLayout = 'list';
+try { if (localStorage.getItem('ledger.monthly.layout') === 'calendar') monthlyLayout = 'calendar'; } catch (e) { /* keep default */ }
+let calendarDate = null;
+function setMonthlyLayout(value) {
+  monthlyLayout = value === 'calendar' ? 'calendar' : 'list';
+  try { localStorage.setItem('ledger.monthly.layout', monthlyLayout); } catch (e) { toast('本次已切换，浏览器未能保存版式'); }
+  exitManageMode();
+  updateSettingsUI();
+  renderList();
+}
+
 /* ==================== 状态 ==================== */
 const state = {
   tab: 'day',
@@ -471,6 +483,8 @@ let recDeleteArmed = null;
 let recDeleteTimer = null;
 
 function updateSettingsUI() {
+  const layout = document.getElementById('monthly-layout');
+  if (layout) layout.value = monthlyLayout;
   const s = state.data.settings;
   const swR = document.getElementById('sw-recurring');
   const swM = document.getElementById('sw-monthstart');
@@ -861,6 +875,37 @@ function manageBarHTML(records) {
   </div>`;
 }
 
+function calendarHTML(records) {
+  const [start, end] = periodRange(state.viewMonth);
+  if (!calendarDate || calendarDate < start || calendarDate > end) {
+    const today = todayStr();
+    calendarDate = today >= start && today <= end ? today : start;
+  }
+  const days = new Map();
+  for (const r of records) {
+    if (!days.has(r.date)) days.set(r.date, new Map());
+    const groups = days.get(r.date), key = `${r.type}:${r.category}`;
+    const group = groups.get(key) || { type: r.type, category: r.category, cents: 0 };
+    group.cents += r.amountCents;
+    groups.set(key, group);
+  }
+  const weekday = new Date(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10)).getDay();
+  let cells = '<span class="calendar-blank" aria-hidden="true"></span>'.repeat((weekday + 6) % 7);
+  let count = (weekday + 6) % 7;
+  for (let date = start; date <= end; date = dayAdd(date, 1)) {
+    const groups = [...(days.get(date) || new Map()).values()];
+    const label = date.slice(5, 7) !== start.slice(5, 7) || date === start ? `${+date.slice(5, 7)}/${+date.slice(8, 10)}` : `${+date.slice(8, 10)}`;
+    cells += `<button type="button" class="calendar-day${date === todayStr() ? ' is-today' : ''}" data-calendar-date="${date}" aria-pressed="${date === calendarDate}" aria-label="${date}${date === todayStr() ? ' 今天' : ''}">
+      <span class="calendar-date">${label}</span>${groups.length ? groups.map(g => `<span class="calendar-category ${g.type === 'income' ? 'calendar-income' : 'calendar-expense'}"><span>${esc(catOf(g.type, g.category).name)}</span><strong>${g.type === 'income' ? '+' : '-'}${fmtYuan(g.cents, false)}</strong></span>`).join('') : '<span class="calendar-none">—</span>'}</button>`;
+    count++;
+  }
+  cells += '<span class="calendar-blank" aria-hidden="true"></span>'.repeat((7 - count % 7) % 7);
+  const selected = records.filter(r => r.date === calendarDate);
+  return `<div class="calendar-hint">按分类汇总 · 金额单位：元<br>点击日期查看逐笔账单</div>
+    <div class="ledger-calendar"><div class="calendar-week">${['一','二','三','四','五','六','日'].map(d => `<span>${d}</span>`).join('')}</div><div class="calendar-grid">${cells}</div></div>
+    <div class="calendar-detail"><div class="day-head"><span>${dayLabel(calendarDate)}</span><span>${selected.length} 笔</span></div>${selected.length ? selected.map(rowHTML).join('') : '<div class="calendar-empty">这一天没有账单</div>'}</div>`;
+}
+
 function renderList() {
   const records = recordsOfMonth(state.viewMonth);
   const { income, expense } = sumsOf(records);
@@ -889,6 +934,11 @@ function renderList() {
     </div>${budgetHTML}`;
 
   const listBox = document.getElementById('record-list');
+  document.getElementById('list-card').classList.toggle('calendar-card', monthlyLayout === 'calendar' && !state.manageMode);
+  if (monthlyLayout === 'calendar' && !state.manageMode) {
+    listBox.innerHTML = manageBarHTML(records) + calendarHTML(records);
+    return;
+  }
   if (records.length === 0) {
     listBox.innerHTML = (state.manageMode ? manageBarHTML(records) : '') + `
       <div class="empty">
@@ -2190,6 +2240,16 @@ function init() {
       renderSyncCard();
       toast('已断开（本机令牌已清除，云端数据保留）');
     }
+  });
+
+  document.getElementById('monthly-layout').addEventListener('change', e => setMonthlyLayout(e.target.value));
+  document.getElementById('record-list').addEventListener('click', e => {
+    const day = e.target.closest('[data-calendar-date]');
+    if (!day) return;
+    calendarDate = day.dataset.calendarDate;
+    renderList();
+    const button = document.querySelector(`[data-calendar-date="${calendarDate}"]`);
+    if (button) button.focus({ preventScroll: true });
   });
 
   // 设置页：开关与周期账单

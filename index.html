@@ -139,6 +139,14 @@
         <div class="page-title">设置</div>
       </div>
       <div class="card">
+        <label class="card-title" for="monthly-layout">月度明细版式</label>
+        <select id="monthly-layout" class="sync-select monthly-layout-select">
+          <option value="list">列表版 · 逐笔账单</option>
+          <option value="calendar">日历版 · 每日分类汇总</option>
+        </select>
+        <div class="set-desc">日历方格显示当天各分类的总额，点击日期查看逐笔账单。版式在本机记住。</div>
+      </div>
+      <div class="card">
         <div class="card-title">账单导入 · 微信 / 支付宝</div>
         <div class="set-desc" style="margin-bottom:10px">
           微信：我 → 服务 → 钱包 → 账单 → 常见问题 → 下载账单（用于个人对账），选时间段发到邮箱，解压后把 CSV 上传到这里<br>
@@ -231,7 +239,7 @@
           <span class="sub-entry-ava" style="background-image:url('assets/chara/me-av-settings.png');background-position:50% 50%" title="夏空"></span>
           <div class="sub-entry-main">
             <div class="sub-entry-title">设置</div>
-            <div class="sub-entry-sub">账单导入 · 周期账单 · 账期起始日</div>
+            <div class="sub-entry-sub">明细版式 · 账单导入 · 账期设置</div>
           </div>
           <span class="sub-entry-go">›</span>
         </div>
@@ -257,7 +265,8 @@
       <div class="card">
         <div class="card-title">关于</div>
         <div class="card-hint">
-          记账本 v5.4.2 · 鸣潮主题记账<br>
+          记账本 v5.5.0 · 鸣潮主题记账<br>
+          · 月度明细支持列表 / 日历版式，设置中切换；日历按天汇总分类金额<br>
           · 月度明细进入默认显示本期，同步后自动校正账期归属<br>
           · 每日明细：进入即看当天账单，可翻任意日期<br>
           · 账单导入：微信 / 支付宝 CSV 一键批量入账（设置页）<br>

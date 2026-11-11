@@ -769,3 +769,25 @@ main { padding: 18px 16px 130px; }
   .splash-bar i { width: 100%; }
 }
 
+
+/* 月度日历：七列日期方格，金额完整显示，分类逐行排列。 */
+.monthly-layout-select { display: block; width: 100%; margin: 12px 0; min-height: 44px; }
+#list-card.calendar-card { padding: 10px 6px; }
+.calendar-hint { font-size: 12px; line-height: 1.7; color: var(--text); padding: 2px 6px 12px; }
+.calendar-week, .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.calendar-week { text-align: center; font-size: 12px; padding: 6px 0; }
+.calendar-day, .calendar-blank { min-height: 82px; border-radius: 5px; background: rgba(255,255,255,.78); }
+.calendar-day { min-width: 0; padding: 5px 2px; border: 1px solid rgba(76,110,245,.15); font: inherit; color: #252a33; cursor: pointer; display: flex; flex-direction: column; align-items: stretch; gap: 5px; text-align: center; }
+.calendar-day[aria-pressed="true"] { outline: 2px solid var(--primary); outline-offset: -2px; background: #eef1fe; }
+.calendar-day:focus-visible { outline: 3px solid var(--primary); }
+.calendar-blank { opacity: .22; }
+.calendar-date { font-size: 12px; font-weight: 700; }
+.is-today .calendar-date { color: #fff; background: var(--primary); border-radius: 5px; }
+.calendar-category { display: flex; flex-direction: column; gap: 1px; font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+.calendar-category strong { font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.calendar-expense { color: #a82d32; }
+.calendar-income { color: #08785b; }
+.calendar-none { font-size: 12px; color: #9298a2; }
+.calendar-detail { margin-top: 16px; padding: 0 6px; }
+.calendar-empty { text-align: center; padding: 24px 0; color: var(--text); font-size: 13px; }
+@media (min-width: 440px) { .calendar-category, .calendar-category strong { font-size: 12px; } .calendar-day { min-height: 96px; } }

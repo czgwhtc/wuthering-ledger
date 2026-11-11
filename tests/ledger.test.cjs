@@ -247,3 +247,52 @@ test('budget detail matches day budget for leap years and custom periods, with d
   assert.equal(c.run("dailyBudgetDetails('2026-11-10').end"), '2026-11-14');
   assert.equal(c.run("dailyBudgetDetails('2026-11-10').days"), 31);
 });
+
+
+test('calendar aggregates per day and type without combining income with expense', () => {
+  const c = setup();
+  c.sandbox.records = [
+    { ...record('a', '2026-11-10', 1200), category: 'food' },
+    { ...record('b', '2026-11-10', 2350), category: 'food' },
+    record('c', '2026-11-10', 500), record('d', '2026-11-10', 900, 'income'),
+    { ...record('e', '2026-11-11', 600), category: 'food' }
+  ];
+  c.run("state.data.records = records; state.viewMonth = '2026-11'; monthlyLayout = 'calendar'; renderList();");
+  const html = c.element('record-list').innerHTML;
+  assert.equal((html.match(/data-calendar-date=/g) || []).length, 30);
+  assert.ok(html.includes('-35.50'));
+  assert.ok(html.includes('-5.00'));
+  assert.ok(html.includes('+9.00'));
+  assert.ok(html.includes('-6.00'));
+  assert.ok(html.includes('4 笔'));
+  assert.ok(!html.includes('data-id="e"'));
+});
+
+test('calendar includes leap day, custom periods across years and empty periods', () => {
+  const c = setup();
+  c.run("state.viewMonth = '2024-02'; monthlyLayout = 'calendar'; renderList();");
+  assert.equal((c.element('record-list').innerHTML.match(/data-calendar-date=/g) || []).length, 29);
+  c.run("state.data.settings.monthStartOn = true; state.data.settings.monthStartDay = 15; state.viewMonth = '2026-12'; renderList();");
+  const html = c.element('record-list').innerHTML;
+  assert.equal((html.match(/data-calendar-date=/g) || []).length, 31);
+  assert.ok(html.includes('data-calendar-date="2026-12-15"'));
+  assert.ok(html.includes('data-calendar-date="2027-01-14"'));
+  assert.ok(!html.includes('data-calendar-date="2027-01-15"'));
+  assert.equal(c.run('calendarDate'), '2026-12-15');
+});
+
+test('calendar preference persists and multi-select exposes all monthly records', () => {
+  const c = setup();
+  c.run("state.viewMonth = '2026-11'; setMonthlyLayout('calendar');");
+  assert.equal(c.storage.get('ledger.monthly.layout'), 'calendar');
+  c.sandbox.records = [record('a', '2026-11-10'), record('b', '2026-11-11')];
+  c.run("state.data.records = records; state.tab = 'list'; enterManageMode('a');");
+  const html = c.element('record-list').innerHTML;
+  assert.ok(html.includes('data-id="a"'));
+  assert.ok(html.includes('data-id="b"'));
+  assert.ok(!html.includes('data-calendar-date='));
+  c.run('exitManageMode();');
+  assert.ok(c.element('record-list').innerHTML.includes('data-calendar-date='));
+  c.run("setMonthlyLayout('list');");
+  assert.equal(c.storage.get('ledger.monthly.layout'), 'list');
+});

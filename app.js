@@ -896,7 +896,10 @@ function calendarHTML(records) {
     const groups = [...(days.get(date) || new Map()).values()];
     const label = date.slice(5, 7) !== start.slice(5, 7) || date === start ? `${+date.slice(5, 7)}/${+date.slice(8, 10)}` : `${+date.slice(8, 10)}`;
     cells += `<button type="button" class="calendar-day${date === todayStr() ? ' is-today' : ''}" data-calendar-date="${date}" aria-pressed="${date === calendarDate}" aria-label="${date}${date === todayStr() ? ' 今天' : ''}">
-      <span class="calendar-date">${label}</span>${groups.length ? groups.map(g => `<span class="calendar-category ${g.type === 'income' ? 'calendar-income' : 'calendar-expense'}"><span>${esc(catOf(g.type, g.category).name)}</span><strong>${g.type === 'income' ? '+' : '-'}${fmtYuan(g.cents, false)}</strong></span>`).join('') : '<span class="calendar-none">—</span>'}</button>`;
+      <span class="calendar-date">${label}</span>${groups.length ? groups.map(g => {
+        const c = catOf(g.type, g.category);
+        return `<span class="calendar-category ${g.type === 'income' ? 'calendar-income' : 'calendar-expense'}"><span class="calendar-category-label">${c.avatar ? `<img class="calendar-category-avatar" src="${c.avatar}" alt="" title="${c.chara}" loading="lazy" onerror="this.outerHTML='${c.icon}'">` : `<span class="calendar-category-avatar-fallback" aria-hidden="true">${c.icon}</span>`}<span>${esc(c.name)}</span></span><strong>${g.type === 'income' ? '+' : '-'}${fmtYuan(g.cents, false)}</strong></span>`;
+      }).join('') : '<span class="calendar-none">—</span>'}</button>`;
     count++;
   }
   cells += '<span class="calendar-blank" aria-hidden="true"></span>'.repeat((7 - count % 7) % 7);

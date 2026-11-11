@@ -784,6 +784,10 @@ main { padding: 18px 16px 130px; }
 .calendar-date { font-size: 12px; font-weight: 700; }
 .is-today .calendar-date { color: #fff; background: var(--primary); border-radius: 5px; }
 .calendar-category { display: flex; flex-direction: column; gap: 1px; font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+.calendar-category-label { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 0; }
+.calendar-category-label > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-category-avatar, .calendar-category-avatar-fallback { width: 16px; height: 16px; flex: 0 0 16px; border-radius: 50%; object-fit: cover; vertical-align: middle; }
+.calendar-category-avatar-fallback { display: inline-flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1; }
 .calendar-category strong { font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .calendar-expense { color: #ff9ca0; }
 .calendar-income { color: #7ce4bd; }
@@ -798,5 +802,6 @@ main { padding: 18px 16px 130px; }
   .calendar-day { padding: 8px 5px; gap: 7px; }
   .calendar-date { font-size: 14px; }
   .calendar-category, .calendar-category strong { font-size: 11px; }
+  .calendar-category-avatar, .calendar-category-avatar-fallback { width: 18px; height: 18px; flex-basis: 18px; }
   .calendar-hint { padding: 4px 8px 14px; }
 }

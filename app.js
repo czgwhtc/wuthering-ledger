@@ -395,6 +395,7 @@ function normalizeData(obj) {
 }
 
 function loadData() {
+  clearDeleteUndo();
   try {
     const raw = localStorage.getItem(dataKey());
     state.data = raw ? normalizeData(JSON.parse(raw)) : defaultData();
@@ -553,6 +554,43 @@ function onRecDeleteClick(btn) {
   }
 }
 
+function dailyBudgetDetails(date) {
+  const budget = state.data.settings.monthlyBudget;
+  const pk = periodOfDate(date);
+  const [start, end] = periodRange(pk);
+  const days = Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
+  const records = recordsOfMonth(pk);
+  const priorExpense = sumsOf(records.filter(r => r.date < date)).expense;
+  const expense = sumsOf(records.filter(r => r.date === date)).expense;
+  const remaining = Math.max(0, budget - priorExpense);
+  return { budget, start, end, days, priorExpense, expense, remaining,
+    dayBudget: Math.round(remaining / days), periodExpense: priorExpense + expense };
+}
+
+function openBudgetDetails() {
+  const d = dailyBudgetDetails(state.viewDate);
+  if (!(d.budget > 0)) return;
+  const monthlyOver = Math.max(0, d.periodExpense - d.budget);
+  const dayRemaining = d.dayBudget - d.expense;
+  document.getElementById('budget-detail-content').innerHTML = `
+    <p class="budget-detail-date">${esc(state.viewDate)} · 账期 ${d.start} 至 ${d.end}</p>
+    <dl class="budget-breakdown">
+      <div><dt>本期预算</dt><dd>${fmtYuan(d.budget)}</dd></div>
+      <div><dt>截至前一天已支出</dt><dd>${fmtYuan(d.priorExpense)}</dd></div>
+      <div><dt>用于计算的剩余预算</dt><dd>${fmtYuan(d.remaining)}</dd></div>
+      <div><dt>本期总天数</dt><dd>${d.days} 天</dd></div>
+    </dl>
+    <p class="budget-equation">${fmtYuan(d.remaining)} ÷ ${d.days} 天 = <strong>日预算 ${fmtYuan(d.dayBudget)}</strong></p>
+    <p class="budget-detail-note">仅扣除所选日期之前的支出，收入、当天及之后的支出不参与日预算计算。按分四舍五入。</p>
+    <dl class="budget-breakdown">
+      <div><dt>当天支出</dt><dd>${fmtYuan(d.expense)}</dd></div>
+      <div class="${dayRemaining < 0 ? 'c-expense' : ''}"><dt>${dayRemaining < 0 ? '当日超支' : '当日剩余'}</dt><dd>${fmtYuan(Math.abs(dayRemaining))}</dd></div>
+    </dl>
+    ${monthlyOver > 0 ? `<p class="budget-over-note">本期截至所选日期已超预算 ${fmtYuan(monthlyOver)}，日预算最低为 ¥0.00。</p>` : ''}`;
+  const dialog = document.getElementById('budget-detail');
+  if (!dialog.open) dialog.showModal();
+}
+
 function renderDay() {
   const sw = document.getElementById('day-switcher');
   const records = state.data.records
@@ -574,12 +612,7 @@ function renderDay() {
   let dayBudgetHTML = '';
   const budget = state.data.settings.monthlyBudget;
   if (budget > 0) {
-    const pk = periodOfDate(state.viewDate);
-    const [ps, pe] = periodRange(pk);
-    const days = Math.round((new Date(pe) - new Date(ps)) / 86400000) + 1;
-    const priorExpense = sumsOf(recordsOfMonth(pk).filter(r => r.date < state.viewDate)).expense;
-    const periodRemaining = Math.max(0, budget - priorExpense);
-    const dayBudget = Math.round(periodRemaining / days);
+    const { days, remaining: periodRemaining, dayBudget } = dailyBudgetDetails(state.viewDate);
     const pct = dayBudget > 0
       ? Math.min(999, Math.round(expense / dayBudget * 100))
       : (expense > 0 ? 999 : 0);
@@ -589,11 +622,11 @@ function renderDay() {
       ? `日预算 ${fmtYuan(dayBudget)} · 已用 ${pct}% · 剩余 ${fmtYuan(remain)}`
       : `日预算 ${fmtYuan(dayBudget)} · 已超支 ${fmtYuan(-remain)}`;
     dayBudgetHTML = `
-      <div class="budget">
+      <button type="button" class="budget budget-open" aria-label="查看日预算计算明细" aria-haspopup="dialog">
         <div class="budget-text ${cls}">${txt}</div>
         <div class="bbar"><div class="bfill ${cls}" style="width:${Math.min(100, pct)}%"></div></div>
-        <div class="budget-sub">本期剩余预算 ${fmtYuan(periodRemaining)} ÷ 账期 ${days} 天（仅扣除此前支出）</div>
-      </div>`;
+        <div class="budget-sub">本期剩余预算 ${fmtYuan(periodRemaining)} ÷ 账期 ${days} 天（仅扣除此前支出）<span class="budget-detail-link">查看明细 ›</span></div>
+      </button>`;
   }
 
   document.getElementById('day-summary-card').innerHTML = `
@@ -804,13 +837,9 @@ function onBatchDeleteClick() {
     renderRecordViews();
     return;
   }
-  state.data.deleted = state.data.deleted || {};
-  for (const id of ids) state.data.deleted[id] = Date.now();
-  state.data.records = state.data.records.filter(r => !ids.has(r.id));
-  saveData();
+  deleteRecordsWithUndo(ids);
   exitManageMode();
   renderAll();
-  toast(`已删除 ${n} 笔账单`);
 }
 
 function manageBarHTML(records) {
@@ -1502,13 +1531,9 @@ function onDeleteClick() {
     deleteTimer = setTimeout(resetDeleteBtn, 2500);
     return;
   }
-  state.data.deleted = state.data.deleted || {};
-  state.data.deleted[state.editingId] = Date.now();
-  state.data.records = state.data.records.filter(r => r.id !== state.editingId);
-  saveData();
+  deleteRecordsWithUndo(new Set([state.editingId]));
   closeSheet();
   renderAll();
-  toast('已删除');
 }
 
 /* ==================== 数据导入导出 ==================== */
@@ -1554,6 +1579,7 @@ function importJSON(e) {
       const normalized = normalizeData(obj);
       if (!confirm(`备份中有 ${normalized.records.length} 笔账单，导入后将覆盖当前全部数据，确定继续吗？`)) return;
       exitManageMode();
+      clearDeleteUndo();
       state.data = normalized;
       saveData();
       state.viewMonth = currentPeriodKey();
@@ -1949,6 +1975,45 @@ function closeSub() {
   if (state.tab === 'me') document.getElementById('view-me').classList.add('active');
 }
 
+// 只保留最近一次删除，限当前账本；恢复的更新时间晚于删除标记，避免云同步再次删掉。
+let deleteUndo = null, deleteUndoTimer = null;
+function clearDeleteUndo() {
+  deleteUndo = null;
+  clearTimeout(deleteUndoTimer);
+  document.getElementById('delete-undo').hidden = true;
+}
+
+function deleteRecordsWithUndo(ids) {
+  const records = state.data.records.filter(r => ids.has(r.id));
+  if (!records.length) return;
+  clearDeleteUndo();
+  state.data.deleted = state.data.deleted || {};
+  const deletedAt = records.reduce((latest, r) => Math.max(latest, recTime(r) + 1), Date.now());
+  for (const r of records) state.data.deleted[r.id] = deletedAt;
+  state.data.records = state.data.records.filter(r => !ids.has(r.id));
+  deleteUndo = { key: dataKey(), records, deletedAt, expiresAt: Date.now() + 8000 };
+  saveData();
+  document.getElementById('delete-undo-message').textContent = `已删除 ${records.length} 笔账单`;
+  document.getElementById('delete-undo').hidden = false;
+  deleteUndoTimer = setTimeout(clearDeleteUndo, 8000);
+}
+
+function undoRecordDeletion() {
+  const pending = deleteUndo;
+  clearDeleteUndo();
+  if (!pending || pending.key !== dataKey() || Date.now() >= pending.expiresAt) return;
+  const existing = new Set(state.data.records.map(r => r.id));
+  const restored = pending.records.filter(r => !existing.has(r.id) &&
+    state.data.deleted[r.id] === pending.deletedAt);
+  for (const r of restored) state.data.records.push({ ...r,
+    updatedAt: Math.max(Date.now(), pending.deletedAt + 1, recTime(r) + 1) });
+  if (!restored.length) { toast('账单状态已变化，无需撤销'); return; }
+  saveData();
+  exitManageMode();
+  renderAll();
+  toast(`已恢复 ${restored.length} 笔账单`);
+}
+
 let toastTimer = null;
 function toast(msg) {
   const t = document.getElementById('toast');
@@ -1986,6 +2051,14 @@ function init() {
   });
   document.getElementById('btn-save').addEventListener('click', saveSheet);
   document.getElementById('btn-delete').addEventListener('click', onDeleteClick);
+  document.getElementById('delete-undo-apply').addEventListener('click', undoRecordDeletion);
+  document.getElementById('delete-undo-dismiss').addEventListener('click', clearDeleteUndo);
+  document.getElementById('day-summary-card').addEventListener('click', e => {
+    if (e.target.closest('.budget-open')) openBudgetDetails();
+  });
+  const budgetDialog = document.getElementById('budget-detail');
+  document.getElementById('budget-detail-close').addEventListener('click', () => budgetDialog.close());
+  budgetDialog.addEventListener('click', e => { if (e.target === budgetDialog) budgetDialog.close(); });
   document.getElementById('sheet').addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); saveSheet(); }
   });

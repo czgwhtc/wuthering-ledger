@@ -257,13 +257,15 @@
       <div class="card">
         <div class="card-title">关于</div>
         <div class="card-hint">
-          记账本 v5.3 · 鸣潮主题记账<br>
+          记账本 v5.4 · 鸣潮主题记账<br>
           · 每日明细：进入即看当天账单，可翻任意日期<br>
           · 账单导入：微信 / 支付宝 CSV 一键批量入账（设置页）<br>
           · 年度账单：全年收支回顾，翻页查看（图表页顶部）<br>
           · 搜索：备注 / 分类 / 角色 / 金额 / 日期一搜即达<br>
           · 周期账单：房租/订阅每月自动记入（设置里开关）<br>
           · 日预算 = 本期截至前一天的剩余预算 ÷ 本期总天数（不扣当天支出）<br>
+          · 点击日预算查看计算明细、当日与本期超支情况<br>
+          · 单条 / 批量删除后，8 秒内可撤销最近一次删除<br>
           · 账期起始日：可按发薪日记账期（设置里开关）<br>
           · 39 位五星限定角色官方海报轮换，每 10 秒换一张<br>
           · 分类头像与角色立绘来自鸣潮 BWIKI / 官网（版权归库洛游戏所有）<br>
@@ -373,7 +375,18 @@
     </div>
   </div>
 
-  <div id="toast" class="toast"></div>
+  <dialog id="budget-detail" class="budget-dialog" aria-labelledby="budget-detail-title">
+    <div class="budget-dialog-card">
+      <div class="sheet-head"><h3 id="budget-detail-title">日预算明细</h3><button type="button" id="budget-detail-close" class="sheet-close" aria-label="关闭预算明细" autofocus>×</button></div>
+      <div id="budget-detail-content"></div>
+    </div>
+  </dialog>
+  <div id="toast" class="toast" role="status"></div>
+  <div id="delete-undo" class="delete-undo" hidden>
+    <span id="delete-undo-message" role="status"></span>
+    <button type="button" id="delete-undo-apply">撤销</button>
+    <button type="button" id="delete-undo-dismiss" aria-label="关闭撤销提示">×</button>
+  </div>
   <div id="record-menu" class="record-menu" role="menu" aria-label="账单操作" hidden>
     <button type="button" id="record-menu-delete" role="menuitem">删除</button>
     <button type="button" id="record-menu-multi" role="menuitem">多选</button>

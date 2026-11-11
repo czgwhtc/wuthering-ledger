@@ -18,6 +18,10 @@ function setup() {
     visibleRecords: () => state.data.records, enterManageMode: id => { state.manageMode = true; selected.push(id); },
     exitManageMode: () => { state.manageMode = false; }, toggleSelect: id => selected.push(id), toggleSelectAll() {},
     onBatchDeleteClick() {}, saveData: () => deleted.push('save'), renderAll() {}, toast() {},
+    deleteRecordsWithUndo(ids) {
+      for (const id of ids) state.data.deleted[id] = Date.now();
+      state.data.records = state.data.records.filter(r => !ids.has(r.id)); deleted.push('save');
+    },
   };
   vm.runInNewContext(code, sandbox);
   const row = { dataset: { id: 'a' }, closest: selector => selector === '.record-row' ? row : null };

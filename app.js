@@ -1905,52 +1905,77 @@ function renderSyncCard() {
 }
 
 /* ==================== 背景音乐 ==================== */
-const MUSIC = { file: 'assets/music/bgm.mp3', title: '繁星，新生，与你 Astrum Unicum' };
+const MUSIC_DEFAULT = { id: 'builtin-bgm', file: 'assets/music/bgm.mp3', title: '繁星，新生，与你 Astrum Unicum', artist: '鸣潮先约电台' };
+let musicAudio = null;
+let musicCatalog = [MUSIC_DEFAULT];
+let musicCurrentId = localStorage.getItem('ledger.music.track') || MUSIC_DEFAULT.id;
 
+function loadMusicCatalog() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('ledger.music.library') || '[]');
+    if (Array.isArray(saved)) musicCatalog = [MUSIC_DEFAULT, ...saved.filter(x => x && x.id && x.dataUrl && x.title)];
+  } catch (_) { musicCatalog = [MUSIC_DEFAULT]; }
+  if (!musicCatalog.some(x => x.id === musicCurrentId)) musicCurrentId = MUSIC_DEFAULT.id;
+}
+function saveMusicCatalog() {
+  try { localStorage.setItem('ledger.music.library', JSON.stringify(musicCatalog.filter(x => x.id !== MUSIC_DEFAULT.id))); }
+  catch (_) { toast('音频太大，无法保存到浏览器'); }
+}
+function selectedMusic() { return musicCatalog.find(x => x.id === musicCurrentId) || MUSIC_DEFAULT; }
+function renderMusicLibrary() {
+  const box = document.getElementById('music-library');
+  if (!box) return;
+  box.innerHTML = musicCatalog.map(track => '<button type="button" class="music-track ' + (track.id === musicCurrentId ? 'selected' : '') + '" data-music-id="' + esc(track.id) + '">' +
+    '<span class="music-track-icon">♫</span><span class="music-track-main"><b>' + esc(track.title) + '</b><small>' + esc(track.artist || '本地音频') + '</small></span>' +
+    '<span class="music-track-check">' + (track.id === musicCurrentId ? '✓' : '') + '</span></button>').join('');
+}
+function setMusicTrack(id, autoplay = false) {
+  const track = musicCatalog.find(x => x.id === id);
+  if (!track) return;
+  musicCurrentId = track.id;
+  localStorage.setItem('ledger.music.track', track.id);
+  if (musicAudio) { musicAudio.pause(); musicAudio.src = track.dataUrl || track.file; musicAudio.load(); if (autoplay) musicAudio.play().catch(() => {}); }
+  renderMusicLibrary(); renderMusicButton();
+}
+function renderMusicButton() {
+  const btn = document.getElementById('music-btn');
+  if (!btn || !musicAudio) return;
+  const playing = !musicAudio.paused;
+  btn.classList.toggle('playing', playing); btn.classList.toggle('paused', !playing);
+  btn.title = (playing ? '暂停：' : '播放：') + selectedMusic().title;
+}
 function initMusic() {
   const btn = document.getElementById('music-btn');
-  const audio = new Audio(MUSIC.file);
-  audio.loop = true;
-  audio.volume = 0.55;
-
-  audio.addEventListener('error', () => btn.classList.add('hidden'), { once: true });
-
-  let started = false;
-  let wantMusic = localStorage.getItem('ledger.music') !== 'off';
-
-  const render = () => {
-    btn.classList.toggle('playing', !audio.paused);
-    btn.classList.toggle('paused', audio.paused);
-  };
-
-  const tryPlay = () => {
-    audio.play().then(() => {
-      render();
-      if (!started) { started = true; toast('♪ ' + MUSIC.title); }
-    }).catch(() => {});
-  };
-
-  // 浏览器要求用户交互后才能出声：首次任意点击开始播放
-  document.addEventListener('pointerdown', () => {
-    if (!started && wantMusic) tryPlay();
-  }, { once: true });
-
-  btn.addEventListener('click', e => {
-    e.stopPropagation();
-    if (audio.paused) {
-      wantMusic = true;
-      localStorage.setItem('ledger.music', 'on');
-      tryPlay();
-    } else {
-      wantMusic = false;
-      localStorage.setItem('ledger.music', 'off');
-      audio.pause();
-      render();
-    }
-  });
-  audio.addEventListener('play', render);
-  audio.addEventListener('pause', render);
-  render();
+  if (!btn) return;
+  loadMusicCatalog();
+  musicAudio = new Audio();
+  musicAudio.loop = true;
+  musicAudio.volume = Number(localStorage.getItem('ledger.music.volume') || '0.55');
+  musicAudio.src = selectedMusic().dataUrl || selectedMusic().file;
+  const volume = document.getElementById('music-volume');
+  if (volume) volume.value = String(musicAudio.volume);
+  const toggle = document.getElementById('music-toggle');
+  const syncControls = () => { renderMusicButton(); if (toggle) toggle.textContent = musicAudio.paused ? '播放' : '暂停'; };
+  musicAudio.addEventListener('play', syncControls); musicAudio.addEventListener('pause', syncControls);
+  musicAudio.addEventListener('error', () => btn.classList.add('hidden'), { once: true });
+  const tryPlay = () => { if (localStorage.getItem('ledger.music') !== 'off') musicAudio.play().catch(() => {}); };
+  document.addEventListener('pointerdown', tryPlay, { once: true });
+  btn.addEventListener('click', e => { e.stopPropagation(); if (musicAudio.paused) { localStorage.setItem('ledger.music', 'on'); musicAudio.play().catch(() => {}); } else { localStorage.setItem('ledger.music', 'off'); musicAudio.pause(); } });
+  if (toggle) toggle.addEventListener('click', () => musicAudio.paused ? musicAudio.play().catch(() => {}) : musicAudio.pause());
+  if (volume) volume.addEventListener('input', () => { musicAudio.volume = Number(volume.value); localStorage.setItem('ledger.music.volume', volume.value); });
+  const library = document.getElementById('music-library');
+  if (library) library.addEventListener('click', e => { const item = e.target.closest('[data-music-id]'); if (item) setMusicTrack(item.dataset.musicId, true); });
+  const file = document.getElementById('music-file'), importBtn = document.getElementById('music-import');
+  if (importBtn && file) {
+    importBtn.addEventListener('click', () => file.click());
+    file.addEventListener('change', () => {
+      [...file.files].forEach(blob => { const reader = new FileReader(); reader.onload = () => {
+        musicCatalog.push({ id: 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2), title: blob.name.replace(/\.[^.]+$/, ''), artist: '本地导入', dataUrl: reader.result });
+        saveMusicCatalog(); renderMusicLibrary(); toast('已添加：' + blob.name);
+      }; reader.readAsDataURL(blob); }); file.value = '';
+    });
+  }
+  renderMusicLibrary(); syncControls();
 }
 
 let profileDeleteArmed = null;

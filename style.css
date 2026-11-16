@@ -10,6 +10,9 @@
   --muted: #8a919e;
   --border: #eceef2;
   --radius: 16px;
+  --glass-bg: rgba(255, 255, 255, .12);
+  --glass-border: rgba(255, 255, 255, .28);
+  --glass-blur: 10px;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -90,6 +93,17 @@ main { padding: 18px 16px 130px; }
 .sub-entry-title { font-size: 15px; font-weight: 700; }
 .sub-entry-sub { font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sub-entry-go { flex: none; font-size: 20px; color: var(--muted); }
+.music-library { display: grid; gap: 8px; margin: 14px 0; }
+.music-track { display: flex; align-items: center; gap: 10px; width: 100%; border: 1px solid var(--glass-border); border-radius: 12px; padding: 10px 12px; background: rgba(255,255,255,.12); color: #273044; text-align: left; cursor: pointer; }
+.music-track.selected { outline: 2px solid var(--primary); outline-offset: -2px; background: rgba(255,255,255,.2); }
+.music-track-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: rgba(90,112,232,.16); color: #4662d8; font-size: 18px; }
+.music-track-main { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.music-track-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.music-track-main small { color: var(--muted); font-size: 11px; }
+.music-track-check { color: var(--primary); font-weight: 800; }
+.music-controls { display: flex; align-items: center; gap: 14px; margin: 12px 0; }
+.music-volume { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; flex: 1; }
+.music-volume input { width: 100%; accent-color: var(--primary); }
 
 /* ---------- 月份切换 ---------- */
 .month-switcher { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
@@ -120,13 +134,13 @@ main { padding: 18px 16px 130px; }
 
 /* ---------- 卡片 ---------- */
 .card {
-  background: rgba(255, 255, 255, .4);
-  backdrop-filter: blur(22px) saturate(1.25);
-  -webkit-backdrop-filter: blur(22px) saturate(1.25);
-  border: 1px solid rgba(255, 255, 255, .38);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.12);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.12);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   padding: 16px; margin-bottom: 14px;
-  box-shadow: 0 4px 18px rgba(10, 14, 30, .1);
+  box-shadow: 0 6px 22px rgba(10, 14, 30, .16);
 }
 .card-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
 .card-hint { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
@@ -337,10 +351,10 @@ main { padding: 18px 16px 130px; }
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 520px;
   display: grid; grid-template-columns: repeat(5, 1fr);
-  background: rgba(255, 255, 255, .68);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border-top: 1px solid rgba(255, 255, 255, .35);
+  background: rgba(255, 255, 255, .2);
+  backdrop-filter: blur(12px) saturate(1.25);
+  -webkit-backdrop-filter: blur(12px) saturate(1.25);
+  border-top: 1px solid rgba(255, 255, 255, .28);
   padding: 6px 0 calc(6px + env(safe-area-inset-bottom)); z-index: 10;
 }
 .tab-btn {
@@ -535,8 +549,8 @@ main { padding: 18px 16px 130px; }
 
 /* 不支持毛玻璃的浏览器退化为近实心卡片 */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .card { background: rgba(255, 255, 255, .95); }
-  .tabbar { background: rgba(255, 255, 255, .97); }
+  .card { background: rgba(255, 255, 255, .18); }
+  .tabbar { background: rgba(255, 255, 255, .28); }
   .sheet { background: rgba(250, 251, 253, .99); }
   .ms-btn { background: rgba(255, 255, 255, .85); }
   .ms-now { background: rgba(255, 255, 255, .85); }
@@ -568,12 +582,12 @@ main { padding: 18px 16px 130px; }
 .search-box {
   display: flex; align-items: center; gap: 10px; height: 52px;
   padding: 0 18px;
-  background: rgba(255, 255, 255, .4);
-  backdrop-filter: blur(22px) saturate(1.25);
-  -webkit-backdrop-filter: blur(22px) saturate(1.25);
-  border: 1px solid rgba(255, 255, 255, .38);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.12);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.12);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
-  box-shadow: 0 4px 18px rgba(10, 14, 30, .1);
+  box-shadow: 0 6px 22px rgba(10, 14, 30, .16);
 }
 .search-box:focus-within { border-color: rgba(255, 255, 255, .72); box-shadow: 0 6px 22px rgba(10, 14, 30, .16); }
 .search-ico { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
@@ -584,9 +598,9 @@ main { padding: 18px 16px 130px; }
 .search-box input::placeholder { color: #707a89; }
 .search-drop {
   position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 5;
-  background: rgba(255, 255, 255, .93);
-  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
-  border: 1px solid rgba(255, 255, 255, .5);
+  background: rgba(255, 255, 255, .16);
+  backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   box-shadow: 0 10px 30px rgba(10, 14, 30, .2);
   padding: 8px 0 6px; overflow: hidden;

@@ -489,6 +489,14 @@ main { padding: 18px 16px 130px; }
   .sheet { background: rgba(250, 251, 253, .99); }
   .ms-btn, .ms-now { background: rgba(7, 11, 20, .42); }
 }
+
+.card .svg-label, .card .svg-tick, .card .svg-month,
+.card .profile-cur, .card .day-count { color: rgba(235,240,250,.68); }
+.card .svg-total { fill: #f2f4fa; }
+.card .svg-label, .card .svg-tick, .card .svg-month { fill: rgba(235,240,250,.68); }
+.card .grid { stroke: rgba(255,255,255,.16); }
+.card .axis { stroke: rgba(255,255,255,.28); }
+.card .calendar-week { color: rgba(235,240,250,.68); }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .sheet-head h3 { margin: 0; font-size: 17px; }
 .sheet-close {
